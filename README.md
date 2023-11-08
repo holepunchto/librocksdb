@@ -1,6 +1,6 @@
 # librocksdb
 
-C bindings for RocksDB with support for asynchronous batch operations.
+Asynchronous C bindings for RocksDB with support for batch operations.
 
 ## API
 

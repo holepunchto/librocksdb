@@ -1,4 +1,5 @@
 list(APPEND tests
+  open-close
 )
 
 foreach(test IN LISTS tests)

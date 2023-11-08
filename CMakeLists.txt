@@ -4,6 +4,8 @@ project(rocksdb C CXX)
 
 set(PORTABLE ON CACHE BOOL "Make a portable RocksDB build" FORCE)
 
+set(WITH_TESTS OFF CACHE BOOL "Build the RocksDB test suite" FORCE)
+
 set(ARTIFACT_SUFFIX _facebook) # Ensure that upstream RocksDB targets don't clash
 
 add_subdirectory(vendor/rocksdb EXCLUDE_FROM_ALL)
