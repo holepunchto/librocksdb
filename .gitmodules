@@ -1,0 +1,8 @@
+[submodule "vendor/libuv"]
+	path = vendor/libuv
+	url = ../../libuv/libuv.git
+	shallow = true
+[submodule "vendor/rocksdb"]
+	path = vendor/rocksdb
+	url = ../../facebook/rocksdb.git
+	shallow = true

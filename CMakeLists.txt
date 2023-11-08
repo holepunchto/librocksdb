@@ -1,0 +1,79 @@
+cmake_minimum_required(VERSION 3.25)
+
+project(rocksdb C CXX)
+
+set(PORTABLE ON CACHE BOOL "Make a portable RocksDB build" FORCE)
+
+set(ARTIFACT_SUFFIX _facebook) # Ensure that upstream RocksDB targets don't clash
+
+add_subdirectory(vendor/rocksdb EXCLUDE_FROM_ALL)
+
+if(NOT TARGET uv)
+  add_subdirectory(vendor/libuv EXCLUDE_FROM_ALL)
+endif()
+
+add_library(rocksdb OBJECT)
+
+set_target_properties(
+  rocksdb
+  PROPERTIES
+  C_STANDARD 99
+  CXX_STANDARD 17
+  POSITION_INDEPENDENT_CODE ON
+)
+
+target_sources(
+  rocksdb
+  INTERFACE
+    include/rocksdb.h
+  PRIVATE
+    src/rocksdb.cc
+)
+
+target_include_directories(
+  rocksdb
+  PUBLIC
+    include
+    $<TARGET_PROPERTY:uv,INTERFACE_INCLUDE_DIRECTORIES>
+  PRIVATE
+    $<TARGET_PROPERTY:rocksdb_facebook,INTERFACE_INCLUDE_DIRECTORIES>
+)
+
+add_library(rocksdb_shared SHARED $<TARGET_OBJECTS:rocksdb>)
+
+set_target_properties(
+  rocksdb_shared
+  PROPERTIES
+  OUTPUT_NAME rocksdb
+  WINDOWS_EXPORT_ALL_SYMBOLS ON
+)
+
+target_link_libraries(
+  rocksdb_shared
+  PRIVATE
+    rocksdb_facebook
+)
+
+add_library(rocksdb_static STATIC $<TARGET_OBJECTS:rocksdb>)
+
+set_target_properties(
+  rocksdb_static
+  PROPERTIES
+  OUTPUT_NAME rocksdb
+  PREFIX lib
+)
+
+target_link_libraries(
+  rocksdb_shared
+  PRIVATE
+    rocksdb_facebook
+)
+
+install(TARGETS rocksdb_shared rocksdb_static)
+
+install(FILES include/rocksdb.h DESTINATION include)
+
+if(PROJECT_IS_TOP_LEVEL)
+  enable_testing()
+  add_subdirectory(test)
+endif()
