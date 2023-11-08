@@ -51,6 +51,7 @@ set_target_properties(
 target_link_libraries(
   rocksdb_shared
   PRIVATE
+    uv
     rocksdb_facebook
 )
 
@@ -64,8 +65,9 @@ set_target_properties(
 )
 
 target_link_libraries(
-  rocksdb_shared
+  rocksdb_static
   PRIVATE
+    uv_a
     rocksdb_facebook
 )
 
