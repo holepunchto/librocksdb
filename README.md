@@ -1,10 +1,10 @@
-# libcompact
+# librocksdb
 
-Compact encoding schemes for C with the same ABI as <https://github.com/holepunchto/compact-encoding>.
+C bindings for RocksDB with support for asynchronous batch operations.
 
 ## API
 
-See [`include/compact.h`](include/compact.h) for the public API.
+See [`include/rocksdb.h`](include/rocksdb.h) for the public API.
 
 ## License
 
