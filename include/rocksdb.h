@@ -47,6 +47,8 @@ struct rocksdb_options_s {
 };
 
 struct rocksdb_open_s {
+  uv_work_t worker;
+
   rocksdb_t *db;
 
   rocksdb_options_t options;
@@ -54,12 +56,18 @@ struct rocksdb_open_s {
   char path[4096 + 1 /* NULL */];
 
   char *error;
+
+  rocksdb_status_cb cb;
 };
 
 struct rocksdb_close_s {
+  uv_work_t worker;
+
   rocksdb_t *db;
 
   char *error;
+
+  rocksdb_status_cb cb;
 };
 
 struct rocksdb_slice_s {
@@ -68,6 +76,10 @@ struct rocksdb_slice_s {
 };
 
 struct rocksdb_batch_s {
+  uv_work_t worker;
+
+  rocksdb_t *db;
+
   size_t len;
   size_t capacity;
 
@@ -76,23 +88,17 @@ struct rocksdb_batch_s {
 
   char **errors;
 
+  rocksdb_batch_cb cb;
+
   // Each batch is a single allocation with an additional buffer at the end
   // used for keys, values, and errors.
   uint8_t buffer[];
 };
 
 struct rocksdb_s {
-  uv_work_t worker;
-
   uv_loop_t *loop;
 
   void *handle; // Opaque database pointer
-
-  rocksdb_batch_t *read;
-  rocksdb_batch_t *write;
-
-  rocksdb_status_cb on_status;
-  rocksdb_batch_cb on_batch;
 };
 
 int
@@ -103,6 +109,24 @@ rocksdb_open (rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksd
 
 int
 rocksdb_close (rocksdb_t *db, rocksdb_close_t *req, rocksdb_status_cb cb);
+
+rocksdb_slice_t
+rocksdb_slice_init (const char *data, size_t len);
+
+void
+rocksdb_slice_destroy (rocksdb_slice_t *slice);
+
+int
+rocksdb_batch_init (rocksdb_batch_t *previous, size_t capacity, rocksdb_batch_t **result);
+
+void
+rocksdb_batch_destroy (rocksdb_batch_t *batch);
+
+int
+rocksdb_read (rocksdb_t *db, rocksdb_batch_t *req, rocksdb_batch_cb cb);
+
+int
+rocksdb_write (rocksdb_t *db, rocksdb_batch_t *req, rocksdb_batch_cb cb);
 
 #ifdef __cplusplus
 }
