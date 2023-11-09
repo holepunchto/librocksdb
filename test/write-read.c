@@ -16,6 +16,8 @@ static rocksdb_batch_t *batch;
 static void
 on_close (rocksdb_t *db, int status) {
   assert(status == 0);
+
+  rocksdb_batch_destroy(batch);
 }
 
 static void
@@ -80,6 +82,4 @@ main () {
 
   e = uv_run(loop, UV_RUN_DEFAULT);
   assert(e == 0);
-
-  rocksdb_batch_destroy(batch);
 }
