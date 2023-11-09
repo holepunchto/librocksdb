@@ -1,4 +1,7 @@
+#include <rocksdb/advanced_options.h>
 #include <rocksdb/db.h>
+#include <rocksdb/options.h>
+#include <rocksdb/table.h>
 #include <stdlib.h>
 #include <string.h>
 #include <uv.h>
@@ -9,7 +12,26 @@ using namespace rocksdb;
 
 static_assert(sizeof(Slice) == sizeof(rocksdb_slice_t));
 
-static const rocksdb_options_t rocksdb__default_options = {};
+static const rocksdb_options_t rocksdb__default_options = {
+  .version = 0,
+  .create_if_missing = false,
+  .max_background_jobs = 2,
+  .bytes_per_sync = 0,
+  .compaction_style = rocksdb_compaction_style_level,
+  .enable_blob_files = false,
+  .min_blob_size = 0,
+  .blob_file_size = 1 << 28,
+  .enable_blob_garbage_collection = false,
+  .table_block_size = 4 * 1024,
+  .table_cache_index_and_filter_blocks = false,
+  .table_format_version = 5,
+};
+
+template <typename T, T rocksdb_options_t::*P>
+static inline T
+rocksdb__option (const rocksdb_options_t *options, int min_version, T fallback = rocksdb__default_options.*P) {
+  return options->version >= min_version ? options->*P : fallback;
+}
 
 extern "C" int
 rocksdb_init (uv_loop_t *loop, rocksdb_t *db) {
@@ -35,7 +57,22 @@ rocksdb__on_open (uv_work_t *handle) {
 
   Options options;
 
-  options.create_if_missing = req->options.create_if_missing;
+  options.create_if_missing = rocksdb__option<bool, &rocksdb_options_t::create_if_missing>(&req->options, 0);
+  options.max_background_jobs = rocksdb__option<int, &rocksdb_options_t::max_background_jobs>(&req->options, 0);
+  options.bytes_per_sync = rocksdb__option<uint64_t, &rocksdb_options_t::bytes_per_sync>(&req->options, 0);
+  options.compaction_style = CompactionStyle(rocksdb__option<rocksdb_compaction_style_t, &rocksdb_options_t::compaction_style>(&req->options, 0));
+  options.enable_blob_files = rocksdb__option<bool, &rocksdb_options_t::enable_blob_files>(&req->options, 0);
+  options.min_blob_size = rocksdb__option<uint64_t, &rocksdb_options_t::min_blob_size>(&req->options, 0);
+  options.blob_file_size = rocksdb__option<uint64_t, &rocksdb_options_t::blob_file_size>(&req->options, 0);
+  options.enable_blob_garbage_collection = rocksdb__option<bool, &rocksdb_options_t::enable_blob_garbage_collection>(&req->options, 0);
+
+  BlockBasedTableOptions table_options;
+
+  table_options.block_size = rocksdb__option<uint64_t, &rocksdb_options_t::table_block_size>(&req->options, 0);
+  table_options.cache_index_and_filter_blocks = rocksdb__option<bool, &rocksdb_options_t::table_cache_index_and_filter_blocks>(&req->options, 0);
+  table_options.format_version = rocksdb__option<uint32_t, &rocksdb_options_t::table_format_version>(&req->options, 0);
+
+  options.table_factory = std::shared_ptr<TableFactory>(NewBlockBasedTableFactory(table_options));
 
   Status status;
 

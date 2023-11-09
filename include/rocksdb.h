@@ -44,6 +44,27 @@ struct rocksdb_options_s {
 
   /** @since 0 */
   rocksdb_compaction_style_t compaction_style;
+
+  /** @since 0 */
+  bool enable_blob_files;
+
+  /** @since 0 */
+  uint64_t min_blob_size;
+
+  /** @since 0 */
+  uint64_t blob_file_size;
+
+  /** @since 0 */
+  bool enable_blob_garbage_collection;
+
+  /** @since 0 */
+  uint64_t table_block_size;
+
+  /** @since 0 */
+  bool table_cache_index_and_filter_blocks;
+
+  /** @since 0 */
+  uint32_t table_format_version;
 };
 
 struct rocksdb_open_s {
