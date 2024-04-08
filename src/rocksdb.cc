@@ -14,6 +14,7 @@ static_assert(sizeof(Slice) == sizeof(rocksdb_slice_t));
 
 static const rocksdb_options_t rocksdb__default_options = {
   .version = 0,
+  .read_only = false,
   .create_if_missing = false,
   .max_background_jobs = 2,
   .bytes_per_sync = 0,
@@ -105,11 +106,15 @@ rocksdb__on_open (uv_work_t *handle) {
 
   options.table_factory = std::shared_ptr<TableFactory>(NewBlockBasedTableFactory(table_options));
 
+  auto read_only = rocksdb__option<&rocksdb_options_t::read_only, bool>(
+    &req->options, 0
+  );
+
   Status status;
 
   auto db = reinterpret_cast<DB **>(&req->db->handle);
 
-  if (req->options.read_only) {
+  if (read_only) {
     status = DB::OpenForReadOnly(options, req->path, db);
   } else {
     status = DB::Open(options, req->path, db);
