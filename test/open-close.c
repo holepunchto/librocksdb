@@ -11,21 +11,21 @@ static rocksdb_open_t open_req;
 static rocksdb_close_t close_req;
 
 static void
-on_close (rocksdb_t *db, int status) {
+on_close (rocksdb_t *db, int status, void *data) {
   assert(status == 0);
 
   close_called = true;
 }
 
 static void
-on_open (rocksdb_t *db, int status) {
+on_open (rocksdb_t *db, int status, void *data) {
   int e;
 
   assert(status == 0);
 
   open_called = true;
 
-  e = rocksdb_close(db, &close_req, on_close);
+  e = rocksdb_close(db, &close_req, NULL, on_close);
   assert(e == 0);
 }
 
@@ -43,7 +43,7 @@ main () {
     .create_if_missing = true,
   };
 
-  e = rocksdb_open(&db, &open_req, "test/fixtures/test.db", &options, on_open);
+  e = rocksdb_open(&db, &open_req, "test/fixtures/test.db", &options, NULL, on_open);
   assert(e == 0);
 
   e = uv_run(loop, UV_RUN_DEFAULT);

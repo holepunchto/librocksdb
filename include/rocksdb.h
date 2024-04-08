@@ -16,8 +16,8 @@ typedef struct rocksdb_slice_s rocksdb_slice_t;
 typedef struct rocksdb_batch_s rocksdb_batch_t;
 typedef struct rocksdb_s rocksdb_t;
 
-typedef void (*rocksdb_status_cb)(rocksdb_t *db, int status);
-typedef void (*rocksdb_batch_cb)(rocksdb_t *db, int status);
+typedef void (*rocksdb_status_cb)(rocksdb_t *db, int status, void *data);
+typedef void (*rocksdb_batch_cb)(rocksdb_t *db, int status, void *data);
 
 typedef enum {
   rocksdb_compaction_style_level = 0,
@@ -79,6 +79,8 @@ struct rocksdb_open_s {
   char *error;
 
   rocksdb_status_cb cb;
+
+  void *data;
 };
 
 struct rocksdb_close_s {
@@ -89,6 +91,8 @@ struct rocksdb_close_s {
   char *error;
 
   rocksdb_status_cb cb;
+
+  void *data;
 };
 
 struct rocksdb_slice_s {
@@ -111,6 +115,8 @@ struct rocksdb_batch_s {
 
   rocksdb_batch_cb cb;
 
+  void *data;
+
   // Each batch is a single allocation with an additional buffer at the end
   // used for keys, values, and errors.
   uint8_t buffer[];
@@ -126,10 +132,10 @@ int
 rocksdb_init (uv_loop_t *loop, rocksdb_t *db);
 
 int
-rocksdb_open (rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, rocksdb_status_cb cb);
+rocksdb_open (rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, void *data, rocksdb_status_cb cb);
 
 int
-rocksdb_close (rocksdb_t *db, rocksdb_close_t *req, rocksdb_status_cb cb);
+rocksdb_close (rocksdb_t *db, rocksdb_close_t *req, void *data, rocksdb_status_cb cb);
 
 rocksdb_slice_t
 rocksdb_slice_init (const char *data, size_t len);
@@ -144,10 +150,10 @@ void
 rocksdb_batch_destroy (rocksdb_batch_t *batch);
 
 int
-rocksdb_read (rocksdb_t *db, rocksdb_batch_t *req, rocksdb_batch_cb cb);
+rocksdb_read (rocksdb_t *db, rocksdb_batch_t *req, void *data, rocksdb_batch_cb cb);
 
 int
-rocksdb_write (rocksdb_t *db, rocksdb_batch_t *req, rocksdb_batch_cb cb);
+rocksdb_write (rocksdb_t *db, rocksdb_batch_t *req, void *data, rocksdb_batch_cb cb);
 
 #ifdef __cplusplus
 }

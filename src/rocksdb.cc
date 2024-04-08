@@ -2,6 +2,7 @@
 #include <vector>
 
 #include <rocksdb/advanced_options.h>
+#include <rocksdb/convenience.h>
 #include <rocksdb/db.h>
 #include <rocksdb/filter_policy.h>
 #include <rocksdb/options.h>
@@ -51,7 +52,7 @@ static inline void
 rocksdb__on_status (uv_work_t *handle, int status) {
   auto req = reinterpret_cast<T *>(handle->data);
 
-  req->cb(req->db, status);
+  req->cb(req->db, status, req->data);
 
   if (req->error) free(req->error);
 }
@@ -130,11 +131,12 @@ rocksdb__on_open (uv_work_t *handle) {
 }
 
 extern "C" int
-rocksdb_open (rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, rocksdb_status_cb cb) {
+rocksdb_open (rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, void *data, rocksdb_status_cb cb) {
   req->db = db;
   req->options = options ? *options : rocksdb__default_options;
   req->error = nullptr;
   req->cb = cb;
+  req->data = data;
 
   strcpy(req->path, path);
 
@@ -149,6 +151,8 @@ rocksdb__on_close (uv_work_t *handle) {
 
   auto rocks = reinterpret_cast<DB *>(req->db->handle);
 
+  CancelAllBackgroundWork(rocks, true);
+
   auto status = rocks->Close();
 
   delete rocks;
@@ -157,10 +161,11 @@ rocksdb__on_close (uv_work_t *handle) {
 }
 
 extern "C" int
-rocksdb_close (rocksdb_t *db, rocksdb_close_t *req, rocksdb_status_cb cb) {
+rocksdb_close (rocksdb_t *db, rocksdb_close_t *req, void *data, rocksdb_status_cb cb) {
   req->db = db;
   req->error = nullptr;
   req->cb = cb;
+  req->data = data;
 
   req->worker.data = static_cast<void *>(req);
 
@@ -212,7 +217,7 @@ static void
 rocksdb__on_after_batch (uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_batch_t *>(handle->data);
 
-  req->cb(req->db, status);
+  req->cb(req->db, status, req->data);
 
   for (size_t i = 0, n = req->len; i < n; i++) {
     if (req->errors[i]) free(req->errors[i]);
@@ -255,9 +260,10 @@ rocksdb__on_read (uv_work_t *handle) {
 }
 
 extern "C" int
-rocksdb_read (rocksdb_t *db, rocksdb_batch_t *req, rocksdb_batch_cb cb) {
+rocksdb_read (rocksdb_t *db, rocksdb_batch_t *req, void *data, rocksdb_batch_cb cb) {
   req->db = db;
   req->cb = cb;
+  req->data = data;
 
   req->worker.data = static_cast<void *>(req);
 
@@ -294,9 +300,10 @@ rocksdb__on_write (uv_work_t *handle) {
 }
 
 extern "C" int
-rocksdb_write (rocksdb_t *db, rocksdb_batch_t *req, rocksdb_batch_cb cb) {
+rocksdb_write (rocksdb_t *db, rocksdb_batch_t *req, void *data, rocksdb_batch_cb cb) {
   req->db = db;
   req->cb = cb;
+  req->data = data;
 
   req->worker.data = static_cast<void *>(req);
 
