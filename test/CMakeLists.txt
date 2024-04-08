@@ -12,12 +12,6 @@ foreach(test IN LISTS tests)
       rocksdb_static
   )
 
-  target_include_directories(
-    ${test}
-    PRIVATE
-      $<TARGET_PROPERTY:rocksdb,INTERFACE_INCLUDE_DIRECTORIES>
-  )
-
   add_test(
     NAME ${test}
     COMMAND ${test}

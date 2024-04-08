@@ -41,7 +41,7 @@ target_include_directories(
     $<TARGET_PROPERTY:rocksdb_facebook,INTERFACE_INCLUDE_DIRECTORIES>
 )
 
-add_library(rocksdb_shared SHARED $<TARGET_OBJECTS:rocksdb>)
+add_library(rocksdb_shared SHARED)
 
 set_target_properties(
   rocksdb_shared
@@ -52,12 +52,14 @@ set_target_properties(
 
 target_link_libraries(
   rocksdb_shared
-  PRIVATE
+  PUBLIC
     uv
+    rocksdb
+  PRIVATE
     rocksdb_facebook
 )
 
-add_library(rocksdb_static STATIC $<TARGET_OBJECTS:rocksdb>)
+add_library(rocksdb_static STATIC)
 
 set_target_properties(
   rocksdb_static
@@ -68,8 +70,10 @@ set_target_properties(
 
 target_link_libraries(
   rocksdb_static
-  PRIVATE
+  PUBLIC
     uv_a
+    rocksdb
+  PRIVATE
     rocksdb_facebook
 )
 
@@ -79,5 +83,6 @@ install(FILES include/rocksdb.h DESTINATION include)
 
 if(PROJECT_IS_TOP_LEVEL)
   enable_testing()
+
   add_subdirectory(test)
 endif()
