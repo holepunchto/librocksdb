@@ -25,7 +25,7 @@ static const rocksdb_options_t rocksdb__default_options = {
   .enable_blob_garbage_collection = false,
   .table_block_size = 4 * 1024,
   .table_cache_index_and_filter_blocks = false,
-  .table_format_version = 5,
+  .table_format_version = 6,
 };
 
 template <auto rocksdb_options_t::*P, typename T>
