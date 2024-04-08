@@ -1,5 +1,9 @@
+#include <memory>
+#include <vector>
+
 #include <rocksdb/advanced_options.h>
 #include <rocksdb/db.h>
+#include <rocksdb/filter_policy.h>
 #include <rocksdb/options.h>
 #include <rocksdb/table.h>
 #include <stdlib.h>
@@ -103,6 +107,8 @@ rocksdb__on_open (uv_work_t *handle) {
   table_options.format_version = rocksdb__option<&rocksdb_options_t::table_format_version, uint32_t>(
     &req->options, 0
   );
+
+  table_options.filter_policy = std::shared_ptr<const FilterPolicy>(NewBloomFilterPolicy(10.0));
 
   options.table_factory = std::shared_ptr<TableFactory>(NewBlockBasedTableFactory(table_options));
 
