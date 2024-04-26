@@ -277,7 +277,11 @@ rocksdb__on_write (uv_work_t *handle) {
     WriteBatch batch;
 
     for (size_t i = 0, n = req->len; i < n; i++) {
-      batch.Put(db->DefaultColumnFamily(), reinterpret_cast<Slice &>(req->keys[i]), reinterpret_cast<Slice &>(req->values[i]));
+      if (req->values[i].len == 0) {
+        batch.Delete(db->DefaultColumnFamily(), reinterpret_cast<Slice &>(req->keys[i]));
+      } else {
+        batch.Put(db->DefaultColumnFamily(), reinterpret_cast<Slice &>(req->keys[i]), reinterpret_cast<Slice &>(req->values[i]));
+      }
     }
 
     auto status = db->Write(WriteOptions(), &batch);
