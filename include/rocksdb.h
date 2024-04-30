@@ -108,8 +108,8 @@ struct rocksdb_delete_range_s {
 
   rocksdb_t *db;
 
-  const rocksdb_slice_t *start;
-  const rocksdb_slice_t *end;
+  rocksdb_slice_t start;
+  rocksdb_slice_t end;
 
   char *error;
 
@@ -162,7 +162,7 @@ void
 rocksdb_slice_destroy (rocksdb_slice_t *slice);
 
 int
-rocksdb_delete_range (rocksdb_t *db, rocksdb_delete_range_t *req, const rocksdb_slice_t *start, const rocksdb_slice_t *end, rocksdb_delete_range_cb cb);
+rocksdb_delete_range (rocksdb_t *db, rocksdb_delete_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_delete_range_cb cb);
 
 int
 rocksdb_batch_init (rocksdb_batch_t *previous, size_t capacity, rocksdb_batch_t **result);

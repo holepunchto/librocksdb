@@ -195,7 +195,7 @@ rocksdb__on_delete_range (uv_work_t *handle) {
 
   auto db = reinterpret_cast<DB *>(req->db->handle);
 
-  auto status = db->DeleteRange(WriteOptions(), reinterpret_cast<const Slice &>(*req->start), reinterpret_cast<const Slice &>(*req->end));
+  auto status = db->DeleteRange(WriteOptions(), reinterpret_cast<Slice &>(req->start), reinterpret_cast<Slice &>(req->end));
 
   if (status.ok()) {
     req->error = nullptr;
@@ -205,7 +205,7 @@ rocksdb__on_delete_range (uv_work_t *handle) {
 }
 
 extern "C" int
-rocksdb_delete_range (rocksdb_t *db, rocksdb_delete_range_t *req, const rocksdb_slice_t *start, const rocksdb_slice_t *end, rocksdb_delete_range_cb cb) {
+rocksdb_delete_range (rocksdb_t *db, rocksdb_delete_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_delete_range_cb cb) {
   req->db = db;
   req->start = start;
   req->end = end;
