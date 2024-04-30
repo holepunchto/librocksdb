@@ -180,6 +180,42 @@ rocksdb_slice_destroy (rocksdb_slice_t *slice) {
   free(const_cast<char *>(slice->data));
 }
 
+static void
+rocksdb__on_after_delete_range (uv_work_t *handle, int status) {
+  auto req = reinterpret_cast<rocksdb_delete_range_t *>(handle->data);
+
+  req->cb(req, status);
+
+  if (req->error) free(req->error);
+}
+
+static void
+rocksdb__on_delete_range (uv_work_t *handle) {
+  auto req = reinterpret_cast<rocksdb_delete_range_t *>(handle->data);
+
+  auto db = reinterpret_cast<DB *>(req->db->handle);
+
+  auto status = db->DeleteRange(WriteOptions(), reinterpret_cast<const Slice &>(*req->start), reinterpret_cast<const Slice &>(*req->end));
+
+  if (status.ok()) {
+    req->error = nullptr;
+  } else {
+    req->error = strdup(status.getState());
+  }
+}
+
+extern "C" int
+rocksdb_delete_range (rocksdb_t *db, rocksdb_delete_range_t *req, const rocksdb_slice_t *start, const rocksdb_slice_t *end, rocksdb_delete_range_cb cb) {
+  req->db = db;
+  req->start = start;
+  req->end = end;
+  req->cb = cb;
+
+  req->worker.data = static_cast<void *>(req);
+
+  return uv_queue_work(db->loop, &req->worker, rocksdb__on_delete_range, rocksdb__on_after_delete_range);
+}
+
 extern "C" int
 rocksdb_batch_init (rocksdb_batch_t *previous, size_t capacity, rocksdb_batch_t **result) {
   auto batch = static_cast<rocksdb_batch_t *>(realloc(previous, sizeof(rocksdb_batch_t) + 2 * capacity * sizeof(rocksdb_slice_t) + capacity * sizeof(char *)));
