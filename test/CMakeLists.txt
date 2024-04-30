@@ -1,4 +1,5 @@
 list(APPEND tests
+  delete-range
   open-close
   write-read
 )
