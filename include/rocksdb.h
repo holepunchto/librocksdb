@@ -151,10 +151,13 @@ void
 rocksdb_batch_destroy (rocksdb_batch_t *batch);
 
 int
-rocksdb_read (rocksdb_t *db, rocksdb_batch_t *req, rocksdb_batch_cb cb);
+rocksdb_batch_read (rocksdb_t *db, rocksdb_batch_t *req, rocksdb_batch_cb cb);
 
 int
-rocksdb_write (rocksdb_t *db, rocksdb_batch_t *req, rocksdb_batch_cb cb);
+rocksdb_batch_write (rocksdb_t *db, rocksdb_batch_t *req, rocksdb_batch_cb cb);
+
+int
+rocksdb_batch_delete (rocksdb_t *db, rocksdb_batch_t *req, rocksdb_batch_cb cb);
 
 #ifdef __cplusplus
 }
