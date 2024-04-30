@@ -14,7 +14,7 @@ static rocksdb_close_t close_req;
 static rocksdb_batch_t *batch;
 
 static void
-on_close (rocksdb_t *db, int status, void *data) {
+on_close (rocksdb_close_t *req, int status) {
   assert(status == 0);
 
   rocksdb_batch_destroy(batch);
@@ -31,6 +31,9 @@ on_read (rocksdb_batch_t *req, int status) {
   assert(strcmp(batch->values[0].data, "world") == 0);
 
   rocksdb_slice_destroy(&batch->values[0]);
+
+  e = rocksdb_close(&db, &close_req, on_close);
+  assert(e == 0);
 }
 
 static void
