@@ -8,6 +8,8 @@
       './vendor/rocksdb/include',
     ],
     'sources': [
+      './src/rocksdb.cc',
+      './src/version.cc',
       './vendor/rocksdb/cache/cache.cc',
       './vendor/rocksdb/cache/cache_entry_roles.cc',
       './vendor/rocksdb/cache/cache_helpers.cc',
