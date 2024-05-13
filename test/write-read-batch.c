@@ -46,7 +46,7 @@ on_write (rocksdb_batch_t *req, int status) {
   batch->keys[0] = rocksdb_slice_init("hello", 5);
   batch->values[0] = rocksdb_slice_init(NULL, 0);
 
-  e = rocksdb_batch_read(&db, batch, on_read);
+  e = rocksdb_batch_read(batch, on_read);
   assert(e == 0);
 }
 
@@ -60,7 +60,7 @@ on_open (rocksdb_open_t *req, int status) {
   batch->keys[0] = rocksdb_slice_init("hello", 5);
   batch->values[0] = rocksdb_slice_init("world", 6);
 
-  e = rocksdb_batch_write(&db, batch, on_write);
+  e = rocksdb_batch_write(batch, on_write);
   assert(e == 0);
 }
 
@@ -77,7 +77,7 @@ main () {
     .create_if_missing = true,
   };
 
-  e = rocksdb_batch_init(NULL, 8, &batch);
+  e = rocksdb_batch_init(&db, NULL, 8, &batch);
   assert(e == 0);
 
   e = rocksdb_open(&db, &open_req, "test/fixtures/test.db", &options, on_open);

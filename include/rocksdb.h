@@ -13,14 +13,18 @@ typedef struct rocksdb_options_s rocksdb_options_t;
 typedef struct rocksdb_open_s rocksdb_open_t;
 typedef struct rocksdb_close_s rocksdb_close_t;
 typedef struct rocksdb_slice_s rocksdb_slice_t;
+typedef struct rocksdb_read_range_s rocksdb_read_range_t;
 typedef struct rocksdb_delete_range_s rocksdb_delete_range_t;
+typedef struct rocksdb_iterator_s rocksdb_iterator_t;
 typedef struct rocksdb_batch_s rocksdb_batch_t;
 typedef struct rocksdb_s rocksdb_t;
 
 typedef void (*rocksdb_open_cb)(rocksdb_open_t *req, int status);
 typedef void (*rocksdb_close_cb)(rocksdb_close_t *req, int status);
+typedef void (*rocksdb_read_range_cb)(rocksdb_read_range_t *req, int status);
 typedef void (*rocksdb_delete_range_cb)(rocksdb_delete_range_t *req, int status);
-typedef void (*rocksdb_batch_cb)(rocksdb_batch_t *req, int status);
+typedef void (*rocksdb_iterator_cb)(rocksdb_iterator_t *iterator, int status);
+typedef void (*rocksdb_batch_cb)(rocksdb_batch_t *batch, int status);
 
 typedef enum {
   rocksdb_compaction_style_level = 0,
@@ -103,6 +107,26 @@ struct rocksdb_slice_s {
   size_t len;
 };
 
+struct rocksdb_read_range_s {
+  uv_work_t worker;
+
+  rocksdb_t *db;
+
+  rocksdb_slice_t start;
+  rocksdb_slice_t end;
+
+  size_t len;
+  size_t capacity;
+
+  rocksdb_slice_t *values;
+
+  char *error;
+
+  rocksdb_read_range_cb cb;
+
+  void *data;
+};
+
 struct rocksdb_delete_range_s {
   uv_work_t worker;
 
@@ -114,6 +138,28 @@ struct rocksdb_delete_range_s {
   char *error;
 
   rocksdb_delete_range_cb cb;
+
+  void *data;
+};
+
+struct rocksdb_iterator_s {
+  uv_work_t worker;
+
+  rocksdb_t *db;
+
+  void *handle; // Opaque iterator pointer
+
+  rocksdb_slice_t start;
+  rocksdb_slice_t end;
+
+  size_t len;
+  size_t capacity;
+
+  rocksdb_slice_t *values;
+
+  char *error;
+
+  rocksdb_iterator_cb cb;
 
   void *data;
 };
@@ -161,23 +207,47 @@ rocksdb_slice_init (const char *data, size_t len);
 void
 rocksdb_slice_destroy (rocksdb_slice_t *slice);
 
+rocksdb_slice_t
+rocksdb_slice_empty (void);
+
+int
+rocksdb_read_range (rocksdb_t *db, rocksdb_read_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_slice_t *values, size_t capacity, rocksdb_read_range_cb cb);
+
 int
 rocksdb_delete_range (rocksdb_t *db, rocksdb_delete_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_delete_range_cb cb);
 
 int
-rocksdb_batch_init (rocksdb_batch_t *previous, size_t capacity, rocksdb_batch_t **result);
+rocksdb_iterator_init (rocksdb_t *db, rocksdb_iterator_t *iterator, rocksdb_slice_t start, rocksdb_slice_t end);
+
+void
+rocksdb_iterator_destroy (rocksdb_iterator_t *iterator);
+
+int
+rocksdb_iterator_open (rocksdb_iterator_t *iterator, rocksdb_iterator_cb cb);
+
+int
+rocksdb_iterator_close (rocksdb_iterator_t *iterator, rocksdb_iterator_cb cb);
+
+int
+rocksdb_iterator_refresh (rocksdb_iterator_t *iterator, rocksdb_iterator_cb cb);
+
+int
+rocksdb_iterator_read (rocksdb_iterator_t *iterator, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb);
+
+int
+rocksdb_batch_init (rocksdb_t *db, rocksdb_batch_t *previous, size_t capacity, rocksdb_batch_t **result);
 
 void
 rocksdb_batch_destroy (rocksdb_batch_t *batch);
 
 int
-rocksdb_batch_read (rocksdb_t *db, rocksdb_batch_t *req, rocksdb_batch_cb cb);
+rocksdb_batch_read (rocksdb_batch_t *batch, rocksdb_batch_cb cb);
 
 int
-rocksdb_batch_write (rocksdb_t *db, rocksdb_batch_t *req, rocksdb_batch_cb cb);
+rocksdb_batch_write (rocksdb_batch_t *batch, rocksdb_batch_cb cb);
 
 int
-rocksdb_batch_delete (rocksdb_t *db, rocksdb_batch_t *req, rocksdb_batch_cb cb);
+rocksdb_batch_delete (rocksdb_batch_t *batch, rocksdb_batch_cb cb);
 
 #ifdef __cplusplus
 }

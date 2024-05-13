@@ -180,6 +180,96 @@ rocksdb_slice_destroy (rocksdb_slice_t *slice) {
   free(const_cast<char *>(slice->data));
 }
 
+extern "C" rocksdb_slice_t
+rocksdb_slice_empty (void) {
+  return {.data = nullptr, .len = 0};
+}
+
+template <typename T>
+static inline void
+rocksdb__iterator_seek (Iterator *iterator, T *req) {
+  iterator->Seek(reinterpret_cast<Slice &>(req->start));
+}
+
+template <typename T>
+static inline Iterator *
+rocksdb__iterator_open (T *req) {
+  auto db = reinterpret_cast<DB *>(req->db->handle);
+
+  auto iterator = db->NewIterator(ReadOptions());
+
+  rocksdb__iterator_seek(iterator, req);
+
+  return iterator;
+}
+
+template <typename T>
+static inline void
+rocksdb__iterator_read (Iterator *iterator, T *req) {
+  while (iterator->Valid() && req->len < req->capacity) {
+    auto key = iterator->key();
+
+    if (req->end.len && key.compare(reinterpret_cast<Slice &>(req->end)) >= 0) {
+      break;
+    }
+
+    auto value = iterator->value();
+
+    auto len = value.size();
+
+    auto data = reinterpret_cast<char *>(malloc(len));
+
+    memcpy(data, value.data(), len);
+
+    req->values[req->len++] = {.data = data, .len = len};
+
+    iterator->Next();
+  }
+}
+
+static void
+rocksdb__on_after_read_range (uv_work_t *handle, int status) {
+  auto req = reinterpret_cast<rocksdb_read_range_t *>(handle->data);
+
+  req->cb(req, status);
+
+  if (req->error) free(req->error);
+}
+
+static void
+rocksdb__on_read_range (uv_work_t *handle) {
+  auto req = reinterpret_cast<rocksdb_read_range_t *>(handle->data);
+
+  auto iterator = rocksdb__iterator_open(req);
+
+  rocksdb__iterator_read(iterator, req);
+
+  auto status = iterator->status();
+
+  if (status.ok()) {
+    req->error = nullptr;
+  } else {
+    req->error = strdup(status.getState());
+  }
+
+  delete iterator;
+}
+
+extern "C" int
+rocksdb_read_range (rocksdb_t *db, rocksdb_read_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_slice_t *values, size_t capacity, rocksdb_read_range_cb cb) {
+  req->db = db;
+  req->start = start;
+  req->end = end;
+  req->capacity = capacity;
+  req->len = 0;
+  req->values = values;
+  req->cb = cb;
+
+  req->worker.data = static_cast<void *>(req);
+
+  return uv_queue_work(db->loop, &req->worker, rocksdb__on_read_range, rocksdb__on_after_read_range);
+}
+
 static void
 rocksdb__on_after_delete_range (uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_delete_range_t *>(handle->data);
@@ -217,13 +307,132 @@ rocksdb_delete_range (rocksdb_t *db, rocksdb_delete_range_t *req, rocksdb_slice_
 }
 
 extern "C" int
-rocksdb_batch_init (rocksdb_batch_t *previous, size_t capacity, rocksdb_batch_t **result) {
+rocksdb_iterator_init (rocksdb_t *db, rocksdb_iterator_t *iterator, rocksdb_slice_t start, rocksdb_slice_t end) {
+  iterator->db = db;
+  iterator->start = start;
+  iterator->end = end;
+
+  iterator->worker.data = static_cast<void *>(iterator);
+
+  return 0;
+}
+
+extern "C" void
+rocksdb_iterator_destroy (rocksdb_iterator_t *iterator) {}
+
+static void
+rocksdb__on_after_iterator (uv_work_t *handle, int status) {
+  auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
+
+  req->cb(req, status);
+
+  if (req->error) free(req->error);
+}
+
+static void
+rocksdb__on_iterator_open (uv_work_t *handle) {
+  auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
+
+  auto iterator = rocksdb__iterator_open(req);
+
+  req->handle = static_cast<void *>(iterator);
+
+  auto status = iterator->status();
+
+  if (status.ok()) {
+    req->error = nullptr;
+  } else {
+    req->error = strdup(status.getState());
+  }
+}
+
+extern "C" int
+rocksdb_iterator_open (rocksdb_iterator_t *iterator, rocksdb_iterator_cb cb) {
+  iterator->cb = cb;
+
+  return uv_queue_work(iterator->db->loop, &iterator->worker, rocksdb__on_iterator_open, rocksdb__on_after_iterator);
+}
+
+static void
+rocksdb__on_iterator_close (uv_work_t *handle) {
+  auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
+
+  auto iterator = reinterpret_cast<Iterator *>(req->handle);
+
+  delete iterator;
+}
+
+extern "C" int
+rocksdb_iterator_close (rocksdb_iterator_t *iterator, rocksdb_iterator_cb cb) {
+  iterator->cb = cb;
+
+  return uv_queue_work(iterator->db->loop, &iterator->worker, rocksdb__on_iterator_close, rocksdb__on_after_iterator);
+}
+
+static void
+rocksdb__on_iterator_refresh (uv_work_t *handle) {
+  auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
+
+  auto iterator = reinterpret_cast<Iterator *>(req->handle);
+
+  iterator->Refresh();
+
+  rocksdb__iterator_seek(iterator, req);
+
+  auto status = iterator->status();
+
+  if (status.ok()) {
+    req->error = nullptr;
+  } else {
+    req->error = strdup(status.getState());
+  }
+}
+
+extern "C" int
+rocksdb_iterator_refresh (rocksdb_iterator_t *iterator, rocksdb_iterator_cb cb) {
+  iterator->cb = cb;
+
+  return uv_queue_work(iterator->db->loop, &iterator->worker, rocksdb__on_iterator_close, rocksdb__on_after_iterator);
+}
+
+static void
+rocksdb__on_iterator_read (uv_work_t *handle) {
+  auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
+
+  auto iterator = reinterpret_cast<Iterator *>(req->handle);
+
+  rocksdb__iterator_read(iterator, req);
+
+  auto status = iterator->status();
+
+  if (status.ok()) {
+    req->error = nullptr;
+  } else {
+    req->error = strdup(status.getState());
+  }
+}
+
+extern "C" int
+rocksdb_iterator_read (rocksdb_iterator_t *iterator, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb) {
+  iterator->cb = cb;
+  iterator->values = values;
+  iterator->len = 0;
+  iterator->capacity = capacity;
+
+  return uv_queue_work(iterator->db->loop, &iterator->worker, rocksdb__on_iterator_read, rocksdb__on_after_iterator);
+}
+
+extern "C" int
+rocksdb_batch_init (rocksdb_t *db, rocksdb_batch_t *previous, size_t capacity, rocksdb_batch_t **result) {
   auto batch = static_cast<rocksdb_batch_t *>(realloc(previous, sizeof(rocksdb_batch_t) + 2 * capacity * sizeof(rocksdb_slice_t) + capacity * sizeof(char *)));
 
   if (batch == nullptr) return -1;
 
+  batch->db = db;
   batch->len = 0;
   batch->capacity = capacity;
+
+  batch->worker.data = static_cast<void *>(batch);
 
   size_t offset = 0;
 
@@ -294,13 +503,10 @@ rocksdb__on_batch_read (uv_work_t *handle) {
 }
 
 extern "C" int
-rocksdb_batch_read (rocksdb_t *db, rocksdb_batch_t *req, rocksdb_batch_cb cb) {
-  req->db = db;
-  req->cb = cb;
+rocksdb_batch_read (rocksdb_batch_t *batch, rocksdb_batch_cb cb) {
+  batch->cb = cb;
 
-  req->worker.data = static_cast<void *>(req);
-
-  return uv_queue_work(db->loop, &req->worker, rocksdb__on_batch_read, rocksdb__on_after_batch);
+  return uv_queue_work(batch->db->loop, &batch->worker, rocksdb__on_batch_read, rocksdb__on_after_batch);
 }
 
 static void
@@ -337,13 +543,10 @@ rocksdb__on_batch_write (uv_work_t *handle) {
 }
 
 extern "C" int
-rocksdb_batch_write (rocksdb_t *db, rocksdb_batch_t *req, rocksdb_batch_cb cb) {
-  req->db = db;
-  req->cb = cb;
+rocksdb_batch_write (rocksdb_batch_t *batch, rocksdb_batch_cb cb) {
+  batch->cb = cb;
 
-  req->worker.data = static_cast<void *>(req);
-
-  return uv_queue_work(db->loop, &req->worker, rocksdb__on_batch_write, rocksdb__on_after_batch);
+  return uv_queue_work(batch->db->loop, &batch->worker, rocksdb__on_batch_write, rocksdb__on_after_batch);
 }
 
 static void
@@ -376,11 +579,8 @@ rocksdb__on_batch_delete (uv_work_t *handle) {
 }
 
 extern "C" int
-rocksdb_batch_delete (rocksdb_t *db, rocksdb_batch_t *req, rocksdb_batch_cb cb) {
-  req->db = db;
-  req->cb = cb;
+rocksdb_batch_delete (rocksdb_batch_t *batch, rocksdb_batch_cb cb) {
+  batch->cb = cb;
 
-  req->worker.data = static_cast<void *>(req);
-
-  return uv_queue_work(db->loop, &req->worker, rocksdb__on_batch_delete, rocksdb__on_after_batch);
+  return uv_queue_work(batch->db->loop, &batch->worker, rocksdb__on_batch_delete, rocksdb__on_after_batch);
 }

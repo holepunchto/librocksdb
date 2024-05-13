@@ -1,7 +1,8 @@
 list(APPEND tests
   delete-range
   open-close
-  write-read
+  read-range
+  write-read-batch
 )
 
 foreach(test IN LISTS tests)
