@@ -217,19 +217,19 @@ int
 rocksdb_delete_range (rocksdb_t *db, rocksdb_delete_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_delete_range_cb cb);
 
 int
-rocksdb_iterator_init (rocksdb_t *db, rocksdb_iterator_t *iterator, rocksdb_slice_t start, rocksdb_slice_t end);
+rocksdb_iterator_init (rocksdb_t *db, rocksdb_iterator_t *iterator);
 
 void
 rocksdb_iterator_destroy (rocksdb_iterator_t *iterator);
 
 int
-rocksdb_iterator_open (rocksdb_iterator_t *iterator, rocksdb_iterator_cb cb);
+rocksdb_iterator_open (rocksdb_iterator_t *iterator, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_iterator_cb cb);
 
 int
 rocksdb_iterator_close (rocksdb_iterator_t *iterator, rocksdb_iterator_cb cb);
 
 int
-rocksdb_iterator_refresh (rocksdb_iterator_t *iterator, rocksdb_iterator_cb cb);
+rocksdb_iterator_refresh (rocksdb_iterator_t *iterator, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_iterator_cb cb);
 
 int
 rocksdb_iterator_read (rocksdb_iterator_t *iterator, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb);
