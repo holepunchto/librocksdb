@@ -44,7 +44,7 @@ main () {
     .create_if_missing = true,
   };
 
-  e = rocksdb_open(&db, &open_req, "test/fixtures/test.db", &options, on_open);
+  e = rocksdb_open(&db, &open_req, "test/fixtures/open-close.db", &options, on_open);
   assert(e == 0);
 
   e = uv_run(loop, UV_RUN_DEFAULT);

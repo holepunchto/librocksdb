@@ -25,7 +25,7 @@ on_close (rocksdb_close_t *req, int status) {
 }
 
 static void
-on_read (rocksdb_read_range_t *req, int status) {
+on_read_range (rocksdb_read_range_t *req, int status) {
   int e;
 
   assert(status == 0);
@@ -49,7 +49,7 @@ on_read (rocksdb_read_range_t *req, int status) {
 }
 
 static void
-on_write (rocksdb_batch_t *req, int status) {
+on_batch_write (rocksdb_batch_t *req, int status) {
   int e;
 
   assert(status == 0);
@@ -57,7 +57,7 @@ on_write (rocksdb_batch_t *req, int status) {
   rocksdb_slice_t start = rocksdb_slice_init("b", 2);
   rocksdb_slice_t end = rocksdb_slice_init("e", 2);
 
-  e = rocksdb_read_range(&db, &read_req, start, end, keys, values, 4, on_read);
+  e = rocksdb_read_range(&db, &read_req, start, end, keys, values, 4, on_read_range);
   assert(e == 0);
 }
 
@@ -80,7 +80,7 @@ on_open (rocksdb_open_t *req, int status) {
   V(4, "e")
 #undef V
 
-  e = rocksdb_batch_write(batch, on_write);
+  e = rocksdb_batch_write(batch, on_batch_write);
   assert(e == 0);
 }
 
@@ -100,7 +100,7 @@ main () {
   e = rocksdb_batch_init(&db, NULL, 8, &batch);
   assert(e == 0);
 
-  e = rocksdb_open(&db, &open_req, "test/fixtures/test.db", &options, on_open);
+  e = rocksdb_open(&db, &open_req, "test/fixtures/read-range.db", &options, on_open);
   assert(e == 0);
 
   e = uv_run(loop, UV_RUN_DEFAULT);

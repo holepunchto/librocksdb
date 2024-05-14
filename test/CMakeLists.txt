@@ -1,5 +1,6 @@
 list(APPEND tests
   delete-range
+  iterate-prefix
   open-close
   read-range
   write-read-batch
