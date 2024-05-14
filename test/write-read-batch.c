@@ -11,13 +11,15 @@ static rocksdb_t db;
 static rocksdb_open_t open_req;
 static rocksdb_close_t close_req;
 
-static rocksdb_batch_t *batch;
+static rocksdb_batch_t batch;
+
+static rocksdb_slice_t key;
+static rocksdb_slice_t value;
+static char *error;
 
 static void
 on_close (rocksdb_close_t *req, int status) {
   assert(status == 0);
-
-  rocksdb_batch_destroy(batch);
 }
 
 static void
@@ -26,11 +28,11 @@ on_batch_read (rocksdb_batch_t *req, int status) {
 
   assert(status == 0);
 
-  assert(batch->errors[0] == NULL);
+  assert(error == NULL);
 
-  assert(strcmp(batch->values[0].data, "world") == 0);
+  assert(strcmp(value.data, "world") == 0);
 
-  rocksdb_slice_destroy(&batch->values[0]);
+  rocksdb_slice_destroy(&value);
 
   e = rocksdb_close(&db, &close_req, on_close);
   assert(e == 0);
@@ -42,11 +44,10 @@ on_batch_write (rocksdb_batch_t *req, int status) {
 
   assert(status == 0);
 
-  batch->len = 1;
-  batch->keys[0] = rocksdb_slice_init("hello", 5);
-  batch->values[0] = rocksdb_slice_init(NULL, 0);
+  key = rocksdb_slice_init("hello", 5);
+  value = rocksdb_slice_empty();
 
-  e = rocksdb_batch_read(batch, on_batch_read);
+  e = rocksdb_batch_read(&batch, &key, &value, &error, 1, on_batch_read);
   assert(e == 0);
 }
 
@@ -56,11 +57,10 @@ on_open (rocksdb_open_t *req, int status) {
 
   assert(status == 0);
 
-  batch->len = 1;
-  batch->keys[0] = rocksdb_slice_init("hello", 5);
-  batch->values[0] = rocksdb_slice_init("world", 6);
+  key = rocksdb_slice_init("hello", 5);
+  value = rocksdb_slice_init("world", 6);
 
-  e = rocksdb_batch_write(batch, on_batch_write);
+  e = rocksdb_batch_write(&batch, &key, &value, 1, on_batch_write);
   assert(e == 0);
 }
 
@@ -73,12 +73,12 @@ main () {
   e = rocksdb_init(loop, &db);
   assert(e == 0);
 
+  e = rocksdb_batch_init(&db, &batch);
+  assert(e == 0);
+
   rocksdb_options_t options = {
     .create_if_missing = true,
   };
-
-  e = rocksdb_batch_init(&db, NULL, 8, &batch);
-  assert(e == 0);
 
   e = rocksdb_open(&db, &open_req, "test/fixtures/write-read-batch.db", &options, on_open);
   assert(e == 0);

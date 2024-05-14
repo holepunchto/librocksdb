@@ -52,9 +52,11 @@ static inline void
 rocksdb__on_status (uv_work_t *handle, int status) {
   auto req = reinterpret_cast<T *>(handle->data);
 
+  auto error = req->error;
+
   req->cb(req, status);
 
-  if (req->error) free(req->error);
+  if (error) free(error);
 }
 
 static void
@@ -154,9 +156,13 @@ rocksdb__on_close (uv_work_t *handle) {
 
   auto status = rocks->Close();
 
-  delete rocks;
+  if (status.ok()) {
+    req->error = nullptr;
+  } else {
+    req->error = strdup(status.getState());
+  }
 
-  req->error = status.ok() ? nullptr : strdup(status.getState());
+  delete rocks;
 }
 
 extern "C" int
@@ -239,9 +245,11 @@ static void
 rocksdb__on_after_read_range (uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_read_range_t *>(handle->data);
 
+  auto error = req->error;
+
   req->cb(req, status);
 
-  if (req->error) free(req->error);
+  if (error) free(error);
 }
 
 static void
@@ -283,9 +291,11 @@ static void
 rocksdb__on_after_delete_range (uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_delete_range_t *>(handle->data);
 
+  auto error = req->error;
+
   req->cb(req, status);
 
-  if (req->error) free(req->error);
+  if (error) free(error);
 }
 
 static void
@@ -324,16 +334,15 @@ rocksdb_iterator_init (rocksdb_t *db, rocksdb_iterator_t *iterator) {
   return 0;
 }
 
-extern "C" void
-rocksdb_iterator_destroy (rocksdb_iterator_t *iterator) {}
-
 static void
 rocksdb__on_after_iterator (uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
 
+  auto error = req->error;
+
   req->cb(req, status);
 
-  if (req->error) free(req->error);
+  if (error) free(error);
 }
 
 static void
@@ -435,41 +444,16 @@ rocksdb_iterator_read (rocksdb_iterator_t *iterator, rocksdb_slice_t *keys, rock
 }
 
 extern "C" int
-rocksdb_batch_init (rocksdb_t *db, rocksdb_batch_t *previous, size_t capacity, rocksdb_batch_t **result) {
-  auto batch = static_cast<rocksdb_batch_t *>(realloc(previous, sizeof(rocksdb_batch_t) + 2 * capacity * sizeof(rocksdb_slice_t) + capacity * sizeof(char *)));
-
-  if (batch == nullptr) return -1;
-
+rocksdb_batch_init (rocksdb_t *db, rocksdb_batch_t *batch) {
   batch->db = db;
-  batch->len = 0;
-  batch->capacity = capacity;
 
   batch->worker.data = static_cast<void *>(batch);
-
-  size_t offset = 0;
-
-  batch->keys = reinterpret_cast<rocksdb_slice_t *>(batch->buffer + offset);
-
-  offset += capacity * sizeof(rocksdb_slice_t);
-
-  batch->values = reinterpret_cast<rocksdb_slice_t *>(batch->buffer + offset);
-
-  offset += capacity * sizeof(rocksdb_slice_t);
-
-  batch->errors = reinterpret_cast<char **>(batch->buffer + offset);
-
-  *result = batch;
 
   return 0;
 }
 
-extern "C" void
-rocksdb_batch_destroy (rocksdb_batch_t *batch) {
-  free(batch);
-}
-
 static void
-rocksdb__on_after_batch (uv_work_t *handle, int status) {
+rocksdb__on_after_read (uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_batch_t *>(handle->data);
 
   req->cb(req, status);
@@ -509,10 +493,25 @@ rocksdb__on_batch_read (uv_work_t *handle) {
 }
 
 extern "C" int
-rocksdb_batch_read (rocksdb_batch_t *batch, rocksdb_batch_cb cb) {
+rocksdb_batch_read (rocksdb_batch_t *batch, const rocksdb_slice_t *keys, rocksdb_slice_t *values, char **errors, size_t len, rocksdb_batch_cb cb) {
+  batch->keys = keys;
+  batch->values = values;
+  batch->errors = errors;
+  batch->len = len;
   batch->cb = cb;
 
-  return uv_queue_work(batch->db->loop, &batch->worker, rocksdb__on_batch_read, rocksdb__on_after_batch);
+  return uv_queue_work(batch->db->loop, &batch->worker, rocksdb__on_batch_read, rocksdb__on_after_read);
+}
+
+static void
+rocksdb__on_after_write (uv_work_t *handle, int status) {
+  auto req = reinterpret_cast<rocksdb_batch_t *>(handle->data);
+
+  auto error = req->error;
+
+  req->cb(req, status);
+
+  if (error) free(error);
 }
 
 static void
@@ -535,24 +534,33 @@ rocksdb__on_batch_write (uv_work_t *handle) {
     auto status = db->Write(WriteOptions(), &batch);
 
     if (status.ok()) {
-      for (size_t i = 0, n = req->len; i < n; i++) {
-        req->errors[i] = nullptr;
-      }
+      req->error = nullptr;
     } else {
-      auto error = status.getState();
-
-      for (size_t i = 0, n = req->len; i < n; i++) {
-        req->errors[i] = strdup(error);
-      }
+      req->error = strdup(status.getState());
     }
   }
 }
 
 extern "C" int
-rocksdb_batch_write (rocksdb_batch_t *batch, rocksdb_batch_cb cb) {
+rocksdb_batch_write (rocksdb_batch_t *batch, const rocksdb_slice_t *keys, const rocksdb_slice_t *values, size_t len, rocksdb_batch_cb cb) {
+  batch->keys = keys;
+  batch->values = const_cast<rocksdb_slice_t *>(values);
+  batch->error = nullptr;
+  batch->len = len;
   batch->cb = cb;
 
-  return uv_queue_work(batch->db->loop, &batch->worker, rocksdb__on_batch_write, rocksdb__on_after_batch);
+  return uv_queue_work(batch->db->loop, &batch->worker, rocksdb__on_batch_write, rocksdb__on_after_write);
+}
+
+static void
+rocksdb__on_after_delete (uv_work_t *handle, int status) {
+  auto req = reinterpret_cast<rocksdb_batch_t *>(handle->data);
+
+  auto error = req->error;
+
+  req->cb(req, status);
+
+  if (error) free(error);
 }
 
 static void
@@ -571,22 +579,20 @@ rocksdb__on_batch_delete (uv_work_t *handle) {
     auto status = db->Write(WriteOptions(), &batch);
 
     if (status.ok()) {
-      for (size_t i = 0, n = req->len; i < n; i++) {
-        req->errors[i] = nullptr;
-      }
+      req->error = nullptr;
     } else {
-      auto error = status.getState();
-
-      for (size_t i = 0, n = req->len; i < n; i++) {
-        req->errors[i] = strdup(error);
-      }
+      req->error = strdup(status.getState());
     }
   }
 }
 
 extern "C" int
-rocksdb_batch_delete (rocksdb_batch_t *batch, rocksdb_batch_cb cb) {
+rocksdb_batch_delete (rocksdb_batch_t *batch, const rocksdb_slice_t *keys, const rocksdb_slice_t *values, size_t len, rocksdb_batch_cb cb) {
+  batch->keys = keys;
+  batch->values = const_cast<rocksdb_slice_t *>(values);
+  batch->error = nullptr;
+  batch->len = len;
   batch->cb = cb;
 
-  return uv_queue_work(batch->db->loop, &batch->worker, rocksdb__on_batch_delete, rocksdb__on_after_batch);
+  return uv_queue_work(batch->db->loop, &batch->worker, rocksdb__on_batch_delete, rocksdb__on_after_delete);
 }

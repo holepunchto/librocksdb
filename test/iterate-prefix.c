@@ -11,18 +11,15 @@ static rocksdb_t db;
 static rocksdb_open_t open_req;
 static rocksdb_close_t close_req;
 
-static rocksdb_batch_t *batch;
+static rocksdb_batch_t batch;
 static rocksdb_iterator_t iterator;
 
-static rocksdb_slice_t keys[4];
-static rocksdb_slice_t values[4];
+static rocksdb_slice_t keys[8];
+static rocksdb_slice_t values[8];
 
 static void
 on_close (rocksdb_close_t *req, int status) {
   assert(status == 0);
-
-  rocksdb_batch_destroy(batch);
-  rocksdb_iterator_destroy(&iterator);
 }
 
 static void
@@ -90,11 +87,9 @@ on_open (rocksdb_open_t *req, int status) {
 
   assert(status == 0);
 
-  batch->len = 8;
-
 #define V(i, key) \
-  batch->keys[i] = rocksdb_slice_init(key, 3); \
-  batch->values[i] = rocksdb_slice_init(key, 3);
+  keys[i] = rocksdb_slice_init(key, 3); \
+  values[i] = rocksdb_slice_init(key, 3);
 
   V(0, "aa")
   V(1, "ab")
@@ -106,7 +101,7 @@ on_open (rocksdb_open_t *req, int status) {
   V(7, "ad")
 #undef V
 
-  e = rocksdb_batch_write(batch, on_batch_write);
+  e = rocksdb_batch_write(&batch, keys, values, 8, on_batch_write);
   assert(e == 0);
 }
 
@@ -119,7 +114,7 @@ main () {
   e = rocksdb_init(loop, &db);
   assert(e == 0);
 
-  e = rocksdb_batch_init(&db, NULL, 8, &batch);
+  e = rocksdb_batch_init(&db, &batch);
   assert(e == 0);
 
   e = rocksdb_iterator_init(&db, &iterator);

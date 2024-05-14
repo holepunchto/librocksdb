@@ -172,20 +172,21 @@ struct rocksdb_batch_s {
   rocksdb_t *db;
 
   size_t len;
-  size_t capacity;
 
-  rocksdb_slice_t *keys;
+  const rocksdb_slice_t *keys;
   rocksdb_slice_t *values;
 
-  char **errors;
+  union {
+    // A single error for the write or delete batch.
+    char *error;
+
+    // A list of errors for the read batch.
+    char **errors;
+  };
 
   rocksdb_batch_cb cb;
 
   void *data;
-
-  // Each batch is a single allocation with an additional buffer at the end
-  // used for keys, values, and errors.
-  uint8_t buffer[];
 };
 
 struct rocksdb_s {
@@ -221,9 +222,6 @@ rocksdb_delete_range (rocksdb_t *db, rocksdb_delete_range_t *req, rocksdb_slice_
 int
 rocksdb_iterator_init (rocksdb_t *db, rocksdb_iterator_t *iterator);
 
-void
-rocksdb_iterator_destroy (rocksdb_iterator_t *iterator);
-
 int
 rocksdb_iterator_open (rocksdb_iterator_t *iterator, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_iterator_cb cb);
 
@@ -237,19 +235,16 @@ int
 rocksdb_iterator_read (rocksdb_iterator_t *iterator, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb);
 
 int
-rocksdb_batch_init (rocksdb_t *db, rocksdb_batch_t *previous, size_t capacity, rocksdb_batch_t **result);
-
-void
-rocksdb_batch_destroy (rocksdb_batch_t *batch);
+rocksdb_batch_init (rocksdb_t *db, rocksdb_batch_t *batch);
 
 int
-rocksdb_batch_read (rocksdb_batch_t *batch, rocksdb_batch_cb cb);
+rocksdb_batch_read (rocksdb_batch_t *batch, const rocksdb_slice_t *keys, rocksdb_slice_t *values, char **errors, size_t len, rocksdb_batch_cb cb);
 
 int
-rocksdb_batch_write (rocksdb_batch_t *batch, rocksdb_batch_cb cb);
+rocksdb_batch_write (rocksdb_batch_t *batch, const rocksdb_slice_t *keys, const rocksdb_slice_t *values, size_t len, rocksdb_batch_cb cb);
 
 int
-rocksdb_batch_delete (rocksdb_batch_t *batch, rocksdb_batch_cb cb);
+rocksdb_batch_delete (rocksdb_batch_t *batch, const rocksdb_slice_t *keys, const rocksdb_slice_t *values, size_t len, rocksdb_batch_cb cb);
 
 #ifdef __cplusplus
 }
