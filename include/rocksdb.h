@@ -118,6 +118,7 @@ struct rocksdb_read_range_s {
   size_t len;
   size_t capacity;
 
+  rocksdb_slice_t *keys;
   rocksdb_slice_t *values;
 
   char *error;
@@ -155,6 +156,7 @@ struct rocksdb_iterator_s {
   size_t len;
   size_t capacity;
 
+  rocksdb_slice_t *keys;
   rocksdb_slice_t *values;
 
   char *error;
@@ -211,7 +213,7 @@ rocksdb_slice_t
 rocksdb_slice_empty (void);
 
 int
-rocksdb_read_range (rocksdb_t *db, rocksdb_read_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_slice_t *values, size_t capacity, rocksdb_read_range_cb cb);
+rocksdb_read_range (rocksdb_t *db, rocksdb_read_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_read_range_cb cb);
 
 int
 rocksdb_delete_range (rocksdb_t *db, rocksdb_delete_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_delete_range_cb cb);
@@ -232,7 +234,7 @@ int
 rocksdb_iterator_refresh (rocksdb_iterator_t *iterator, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_iterator_cb cb);
 
 int
-rocksdb_iterator_read (rocksdb_iterator_t *iterator, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb);
+rocksdb_iterator_read (rocksdb_iterator_t *iterator, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb);
 
 int
 rocksdb_batch_init (rocksdb_t *db, rocksdb_batch_t *previous, size_t capacity, rocksdb_batch_t **result);

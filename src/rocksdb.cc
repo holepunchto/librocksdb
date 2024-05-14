@@ -185,10 +185,21 @@ rocksdb_slice_empty (void) {
   return {.data = nullptr, .len = 0};
 }
 
+static inline rocksdb_slice_t
+rocksdb__slice_copy (const Slice &slice) {
+  auto len = slice.size();
+
+  auto data = reinterpret_cast<char *>(malloc(len));
+
+  memcpy(data, slice.data(), len);
+
+  return {.data = data, .len = len};
+}
+
 template <typename T>
 static inline void
 rocksdb__iterator_seek (Iterator *iterator, T *req) {
-  iterator->Seek(reinterpret_cast<Slice &>(req->start));
+  iterator->Seek(reinterpret_cast<const Slice &>(req->start));
 }
 
 template <typename T>
@@ -209,19 +220,16 @@ rocksdb__iterator_read (Iterator *iterator, T *req) {
   while (iterator->Valid() && req->len < req->capacity) {
     auto key = iterator->key();
 
-    if (req->end.len && key.compare(reinterpret_cast<Slice &>(req->end)) >= 0) {
+    if (req->end.len && key.compare(reinterpret_cast<const Slice &>(req->end)) >= 0) {
       break;
     }
 
     auto value = iterator->value();
 
-    auto len = value.size();
+    req->keys[req->len] = rocksdb__slice_copy(key);
+    req->values[req->len] = rocksdb__slice_copy(value);
 
-    auto data = reinterpret_cast<char *>(malloc(len));
-
-    memcpy(data, value.data(), len);
-
-    req->values[req->len++] = {.data = data, .len = len};
+    req->len++;
 
     iterator->Next();
   }
@@ -256,13 +264,14 @@ rocksdb__on_read_range (uv_work_t *handle) {
 }
 
 extern "C" int
-rocksdb_read_range (rocksdb_t *db, rocksdb_read_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_slice_t *values, size_t capacity, rocksdb_read_range_cb cb) {
+rocksdb_read_range (rocksdb_t *db, rocksdb_read_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_read_range_cb cb) {
   req->db = db;
   req->start = start;
   req->end = end;
-  req->capacity = capacity;
-  req->len = 0;
+  req->keys = keys;
   req->values = values;
+  req->len = 0;
+  req->capacity = capacity;
   req->cb = cb;
 
   req->worker.data = static_cast<void *>(req);
@@ -285,7 +294,7 @@ rocksdb__on_delete_range (uv_work_t *handle) {
 
   auto db = reinterpret_cast<DB *>(req->db->handle);
 
-  auto status = db->DeleteRange(WriteOptions(), reinterpret_cast<Slice &>(req->start), reinterpret_cast<Slice &>(req->end));
+  auto status = db->DeleteRange(WriteOptions(), reinterpret_cast<const Slice &>(req->start), reinterpret_cast<const Slice &>(req->end));
 
   if (status.ok()) {
     req->error = nullptr;
@@ -415,8 +424,9 @@ rocksdb__on_iterator_read (uv_work_t *handle) {
 }
 
 extern "C" int
-rocksdb_iterator_read (rocksdb_iterator_t *iterator, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb) {
+rocksdb_iterator_read (rocksdb_iterator_t *iterator, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb) {
   iterator->cb = cb;
+  iterator->keys = keys;
   iterator->values = values;
   iterator->len = 0;
   iterator->capacity = capacity;
@@ -480,19 +490,13 @@ rocksdb__on_batch_read (uv_work_t *handle) {
 
     std::vector<Status> statuses(req->len);
 
-    db->MultiGet(ReadOptions(), db->DefaultColumnFamily(), req->len, reinterpret_cast<Slice *>(req->keys), values.data(), statuses.data());
+    db->MultiGet(ReadOptions(), db->DefaultColumnFamily(), req->len, reinterpret_cast<const Slice *>(req->keys), values.data(), statuses.data());
 
     for (size_t i = 0, n = req->len; i < n; i++) {
       auto status = statuses[i];
 
       if (status.ok()) {
-        auto len = values[i].size();
-
-        auto data = reinterpret_cast<char *>(malloc(len));
-
-        memcpy(data, values[i].data(), len);
-
-        req->values[i] = {.data = data, .len = len};
+        req->values[i] = rocksdb__slice_copy(values[i]);
         req->errors[i] = nullptr;
       } else if (status.code() == Status::kNotFound) {
         req->values[i] = {.data = nullptr, .len = 0};
@@ -522,9 +526,9 @@ rocksdb__on_batch_write (uv_work_t *handle) {
 
     for (size_t i = 0, n = req->len; i < n; i++) {
       if (req->values[i].len == 0) {
-        batch.Delete(db->DefaultColumnFamily(), reinterpret_cast<Slice &>(req->keys[i]));
+        batch.Delete(db->DefaultColumnFamily(), reinterpret_cast<const Slice &>(req->keys[i]));
       } else {
-        batch.Put(db->DefaultColumnFamily(), reinterpret_cast<Slice &>(req->keys[i]), reinterpret_cast<Slice &>(req->values[i]));
+        batch.Put(db->DefaultColumnFamily(), reinterpret_cast<const Slice &>(req->keys[i]), reinterpret_cast<const Slice &>(req->values[i]));
       }
     }
 
@@ -561,7 +565,7 @@ rocksdb__on_batch_delete (uv_work_t *handle) {
     WriteBatch batch;
 
     for (size_t i = 0, n = req->len; i < n; i++) {
-      batch.Delete(db->DefaultColumnFamily(), reinterpret_cast<Slice &>(req->keys[i]));
+      batch.Delete(db->DefaultColumnFamily(), reinterpret_cast<const Slice &>(req->keys[i]));
     }
 
     auto status = db->Write(WriteOptions(), &batch);

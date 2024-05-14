@@ -14,6 +14,7 @@ static rocksdb_read_range_t read_req;
 
 static rocksdb_batch_t *batch;
 
+static rocksdb_slice_t keys[4];
 static rocksdb_slice_t values[4];
 
 static void
@@ -32,8 +33,9 @@ on_read (rocksdb_read_range_t *req, int status) {
   assert(req->len == 3);
   assert(req->error == NULL);
 
-#define V(i, value) \
-  assert(strcmp(values[i].data, value) == 0); \
+#define V(i, key) \
+  assert(strcmp(keys[i].data, key) == 0); \
+  assert(strcmp(values[i].data, key) == 0); \
 \
   rocksdb_slice_destroy(&values[i]);
 
@@ -55,7 +57,7 @@ on_write (rocksdb_batch_t *req, int status) {
   rocksdb_slice_t start = rocksdb_slice_init("b", 2);
   rocksdb_slice_t end = rocksdb_slice_init("e", 2);
 
-  e = rocksdb_read_range(&db, &read_req, start, end, values, 4, on_read);
+  e = rocksdb_read_range(&db, &read_req, start, end, keys, values, 4, on_read);
   assert(e == 0);
 }
 
