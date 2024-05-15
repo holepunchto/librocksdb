@@ -410,14 +410,12 @@
         ],
         'msvs_settings': {
           'VCCLCompilerTool': {
+            'RuntimeTypeInfo': 'true',
+            'BufferSecurityCheck': 'true',
+            'DebugInformationFormat': '3',
+            'ExceptionHandling': '1',
+            'StringPooling': 'true',
             'AdditionalOptions': [
-              '/Zi',
-              '/EHsc',
-              '/GS',
-              '/Gd',
-              '/GR',
-              '/GF',
-              '/FC',
               '/std:c++17',
             ],
           },
