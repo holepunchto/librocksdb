@@ -27,5 +27,24 @@
         'defines': ['NDEBUG'],
       },
     },
+    'conditions': [
+      ['OS=="mac"', {
+        'xcode_settings': {
+          'OTHER_CPLUSPLUSFLAGS': [
+            '-std=c++20',
+          ],
+        },
+      }],
+      ['OS=="linux"', {
+        'cflags_cc': [
+          '-std=c++20',
+        ],
+      }],
+      ['OS=="win"', {
+        'cflags_cc': [
+          '/std:c++20',
+        ],
+      }],
+    ],
   }]
 }

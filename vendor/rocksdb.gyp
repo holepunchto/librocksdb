@@ -408,6 +408,16 @@
           './rocksdb/port/win/win_logger.cc',
           './rocksdb/port/win/win_thread.cc',
         ],
+        'cflags_cc': [
+          '/Zi',
+          '/EHsc',
+          '/GS',
+          '/Gd',
+          '/GR',
+          '/GF',
+          '/FC',
+          '/std:c++17',
+        ],
       }, {
         'defines': [
           'ROCKSDB_PLATFORM_POSIX',
