@@ -401,7 +401,7 @@
           'OS_WIN',
           'NOMINMAX',
         ],
-        libraries': [
+        'libraries': [
           'shlwapi.lib',
           'rpcrt4.lib',
         ],
