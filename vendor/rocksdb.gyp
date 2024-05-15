@@ -415,9 +415,6 @@
             'DebugInformationFormat': '3',
             'ExceptionHandling': '1',
             'StringPooling': 'true',
-            'AdditionalOptions': [
-              '/std:c++17',
-            ],
           },
         },
       }, {
