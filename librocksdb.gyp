@@ -41,9 +41,6 @@
         ],
       }],
       ['OS=="win"', {
-        'defines': [
-          'NOMINMAX',
-        ],
         'msvs_settings': {
           'VCCLCompilerTool': {
             'AdditionalOptions': [

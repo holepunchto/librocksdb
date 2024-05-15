@@ -401,10 +401,6 @@
           'OS_WIN',
           'NOMINMAX',
         ],
-        'libraries': [
-          'shlwapi.lib',
-          'rpcrt4.lib',
-        ],
         'sources': [
           './rocksdb/port/win/env_default.cc',
           './rocksdb/port/win/env_win.cc',
@@ -413,6 +409,15 @@
           './rocksdb/port/win/win_logger.cc',
           './rocksdb/port/win/win_thread.cc',
         ],
+        'direct_dependent_settings': {
+          'defines': [
+            'NOMINMAX',
+          ],
+          'libraries': [
+            'shlwapi.lib',
+            'rpcrt4.lib',
+          ],
+        },
         'msvs_settings': {
           'VCCLCompilerTool': {
             'RuntimeTypeInfo': 'true',
