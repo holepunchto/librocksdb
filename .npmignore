@@ -16,3 +16,5 @@ vendor/rocksdb/**/*
 !vendor/rocksdb/**/*.h
 !vendor/rocksdb/**/*.pc.in
 !vendor/rocksdb/**/*.S
+
+vendor/rocksdb/**/*_test.cc
