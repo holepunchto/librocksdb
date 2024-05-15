@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.25)
 
 project(rocksdb C CXX)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 set(PORTABLE ON CACHE BOOL "Make a portable RocksDB build" FORCE)
 
 set(WITH_TESTS OFF CACHE BOOL "Build the RocksDB test suite" FORCE)
