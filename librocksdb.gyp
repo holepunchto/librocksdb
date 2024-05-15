@@ -41,9 +41,13 @@
         ],
       }],
       ['OS=="win"', {
-        'cflags_cc': [
-          '/std:c++20',
-        ],
+        'msvs_settings': {
+          'VCCLCompilerTool': {
+            'AdditionalOptions': [
+              '/std:c++20',
+            ],
+          },
+        },
       }],
     ],
   }]
