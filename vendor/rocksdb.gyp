@@ -413,10 +413,6 @@
           'defines': [
             'NOMINMAX',
           ],
-          'libraries': [
-            'shlwapi.lib',
-            'rpcrt4.lib',
-          ],
         },
         'msvs_settings': {
           'VCCLCompilerTool': {
