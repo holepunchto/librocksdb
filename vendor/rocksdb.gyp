@@ -399,6 +399,7 @@
       ['OS=="win"', {
         'defines': [
           'OS_WIN',
+          'NOMINMAX',
         ],
         'sources': [
           './rocksdb/port/win/env_default.cc',
