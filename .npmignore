@@ -4,7 +4,6 @@
 test
 vendor/libuv
 
-vendor/rocksdb/java
 vendor/rocksdb/**/*
 
 !vendor/rocksdb/**/CMakeLists.txt
@@ -17,4 +16,10 @@ vendor/rocksdb/**/*
 !vendor/rocksdb/**/*.pc.in
 !vendor/rocksdb/**/*.S
 
+vendor/rocksdb/fuzz
+vendor/rocksdb/java
+vendor/rocksdb/microbench
+vendor/rocksdb/examples
+vendor/rocksdb/db_stress_tool
+vendor/rocksdb/third-party
 vendor/rocksdb/**/*_test.cc
