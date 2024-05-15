@@ -8,6 +8,8 @@ set(WITH_TESTS OFF CACHE BOOL "Build the RocksDB test suite" FORCE)
 
 set(WITH_GFLAGS OFF CACHE BOOL "Build RocksDB with gflags support" FORCE)
 
+set(ROCKSDB_SKIP_THIRDPARTY ON CACHE BOOL "Skip third-party RocksDB integrations" FORCE)
+
 set(ARTIFACT_SUFFIX _facebook) # Ensure that upstream RocksDB targets don't clash
 
 add_subdirectory(vendor/rocksdb EXCLUDE_FROM_ALL)
