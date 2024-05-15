@@ -401,6 +401,10 @@
           'OS_WIN',
           'NOMINMAX',
         ],
+        libraries': [
+          'shlwapi.lib',
+          'rpcrt4.lib',
+        ],
         'sources': [
           './rocksdb/port/win/env_default.cc',
           './rocksdb/port/win/env_win.cc',
