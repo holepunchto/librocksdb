@@ -84,7 +84,7 @@
       './rocksdb/db/memtable_list.cc',
       './rocksdb/db/merge_helper.cc',
       './rocksdb/db/merge_operator.cc',
-      './rocksdb/db/db/multi_cf_iterator.cc',
+      './rocksdb/db/multi_cf_iterator.cc',
       './rocksdb/db/output_validator.cc',
       './rocksdb/db/periodic_task_scheduler.cc',
       './rocksdb/db/range_del_aggregator.cc',
