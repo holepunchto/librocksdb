@@ -36,7 +36,7 @@ static const rocksdb_options_t rocksdb__default_options = {
 template <auto rocksdb_options_t::*P, typename T>
 static inline T
 rocksdb__option (const rocksdb_options_t *options, int min_version, T fallback = T(rocksdb__default_options.*P)) {
-  return T(options->version >= min_version ? options->*P : fallback);
+  return options->version >= min_version ? T(options->*P) : fallback;
 }
 
 extern "C" int
@@ -202,10 +202,133 @@ rocksdb__slice_copy (const Slice &slice) {
   return {.data = data, .len = len};
 }
 
+static inline const Slice &
+rocksdb__slice_cast (const rocksdb_slice_t &slice) {
+  return reinterpret_cast<const Slice &>(slice);
+}
+
+static inline const rocksdb_slice_t &
+rocksdb__slice_cast (const Slice &slice) {
+  return reinterpret_cast<const rocksdb_slice_t &>(slice);
+}
+
+static inline void
+rocksdb__iterator_seek_first (Iterator *iterator, const rocksdb_range_t &range) {
+  if (range.gte.len) {
+    auto gte = rocksdb__slice_cast(range.gte);
+
+    iterator->Seek(gte);
+  } else if (range.gt.len) {
+    auto gt = rocksdb__slice_cast(range.gt);
+
+    iterator->Seek(gt);
+
+    if (iterator->Valid() && iterator->key().compare(gt) == 0) {
+      iterator->Next();
+    }
+  } else {
+    iterator->SeekToFirst();
+  }
+}
+
+static inline void
+rocksdb__iterator_seek_last (Iterator *iterator, const rocksdb_range_t &range) {
+  if (range.lte.len) {
+    auto lte = rocksdb__slice_cast(range.lte);
+
+    iterator->Seek(lte);
+
+    if (iterator->Valid()) {
+      if (iterator->key().compare(lte) > 0) iterator->Prev();
+    } else {
+      iterator->SeekToLast();
+    }
+  } else if (range.lt.len) {
+
+    auto lt = rocksdb__slice_cast(range.lt);
+
+    iterator->Seek(lt);
+
+    if (iterator->Valid()) {
+      if (iterator->key().compare(lt) >= 0) iterator->Prev();
+    } else {
+      iterator->SeekToLast();
+    }
+  } else {
+    iterator->SeekToLast();
+  }
+}
+
+template <bool reverse>
+static inline void
+rocksdb__iterator_seek (Iterator *iterator, const rocksdb_range_t &range) {
+  if (reverse) {
+    rocksdb__iterator_seek_last(iterator, range);
+  } else {
+    rocksdb__iterator_seek_first(iterator, range);
+  }
+}
+
 template <typename T>
 static inline void
 rocksdb__iterator_seek (Iterator *iterator, T *req) {
-  iterator->Seek(reinterpret_cast<const Slice &>(req->start));
+  const auto &range = req->range;
+
+  if (req->reverse) {
+    rocksdb__iterator_seek<true>(iterator, range);
+  } else {
+    rocksdb__iterator_seek<false>(iterator, range);
+  }
+}
+
+template <bool reverse = false>
+static inline void
+rocksdb__iterator_next (Iterator *iterator) {
+  if (reverse) {
+    iterator->Prev();
+  } else {
+    iterator->Next();
+  }
+}
+
+template <typename T>
+static inline void
+rocksdb__iterator_next (Iterator *iterator, T *req) {
+  if (req->reverse) {
+    rocksdb__iterator_next<true>(iterator);
+  } else {
+    rocksdb__iterator_next<false>(iterator);
+  }
+}
+
+static inline bool
+rocksdb__iterator_valid (Iterator *iterator, const rocksdb_range_t &range) {
+  if (!iterator->Valid()) return false;
+
+  auto key = iterator->key();
+
+  return (
+    (range.lt.len == 0 || key.compare(rocksdb__slice_cast(range.lt)) < 0) &&
+    (range.lte.len == 0 || key.compare(rocksdb__slice_cast(range.lte)) <= 0) &&
+    (range.gt.len == 0 || key.compare(rocksdb__slice_cast(range.gt)) > 0) &&
+    (range.gte.len == 0 || key.compare(rocksdb__slice_cast(range.gte)) >= 0)
+  );
+}
+
+template <typename T>
+static inline bool
+rocksdb__iterator_valid (Iterator *iterator, T *req) {
+  return rocksdb__iterator_valid(iterator, req->range);
+}
+
+template <bool reverse = false>
+static inline Iterator *
+rocksdb__iterator_open (DB *db, const rocksdb_range_t &range) {
+  auto iterator = db->NewIterator(ReadOptions());
+
+  rocksdb__iterator_seek<reverse>(iterator, range);
+
+  return iterator;
 }
 
 template <typename T>
@@ -213,32 +336,34 @@ static inline Iterator *
 rocksdb__iterator_open (T *req) {
   auto db = reinterpret_cast<DB *>(req->db->handle);
 
-  auto iterator = db->NewIterator(ReadOptions());
+  const auto &range = req->range;
 
-  rocksdb__iterator_seek(iterator, req);
-
-  return iterator;
+  if (req->reverse) {
+    return rocksdb__iterator_open<true>(db, range);
+  } else {
+    return rocksdb__iterator_open<false>(db, range);
+  }
 }
 
 template <typename T>
 static inline void
 rocksdb__iterator_read (Iterator *iterator, T *req) {
-  while (iterator->Valid() && req->len < req->capacity) {
-    auto key = iterator->key();
+  while (rocksdb__iterator_valid(iterator, req) && req->len < req->capacity) {
+    auto i = req->len++;
 
-    if (req->end.len && key.compare(reinterpret_cast<const Slice &>(req->end)) >= 0) {
-      break;
-    }
+    req->keys[i] = rocksdb__slice_copy(iterator->key());
+    req->values[i] = rocksdb__slice_copy(iterator->value());
 
-    auto value = iterator->value();
-
-    req->keys[req->len] = rocksdb__slice_copy(key);
-    req->values[req->len] = rocksdb__slice_copy(value);
-
-    req->len++;
-
-    iterator->Next();
+    rocksdb__iterator_next(iterator, req);
   }
+}
+
+template <typename T>
+static inline void
+rocksdb__iterator_refresh (Iterator *iterator, T *req) {
+  iterator->Refresh();
+
+  rocksdb__iterator_seek(iterator, req);
 }
 
 static void
@@ -272,10 +397,10 @@ rocksdb__on_read_range (uv_work_t *handle) {
 }
 
 extern "C" int
-rocksdb_read_range (rocksdb_t *db, rocksdb_read_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_read_range_cb cb) {
+rocksdb_read_range (rocksdb_t *db, rocksdb_read_range_t *req, rocksdb_range_t range, bool reverse, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_read_range_cb cb) {
   req->db = db;
-  req->start = start;
-  req->end = end;
+  req->range = range;
+  req->reverse = reverse;
   req->keys = keys;
   req->values = values;
   req->len = 0;
@@ -304,20 +429,40 @@ rocksdb__on_delete_range (uv_work_t *handle) {
 
   auto db = reinterpret_cast<DB *>(req->db->handle);
 
-  auto status = db->DeleteRange(WriteOptions(), reinterpret_cast<const Slice &>(req->start), reinterpret_cast<const Slice &>(req->end));
+  const auto &range = req->range;
 
-  if (status.ok()) {
-    req->error = nullptr;
+  if (range.gte.len && range.lt.len) {
+    auto status = db->DeleteRange(WriteOptions(), rocksdb__slice_cast(range.gte), rocksdb__slice_cast(range.lt));
+
+    if (status.ok()) {
+      req->error = nullptr;
+    } else {
+      req->error = strdup(status.getState());
+    }
   } else {
-    req->error = strdup(status.getState());
+    auto iterator = rocksdb__iterator_open(db, req->range);
+
+    req->error = nullptr;
+
+    while (rocksdb__iterator_valid(iterator, req->range)) {
+      auto status = db->Delete(WriteOptions(), iterator->key());
+
+      if (status.ok()) {
+        rocksdb__iterator_next(iterator);
+      } else {
+        req->error = strdup(status.getState());
+        break;
+      }
+    }
+
+    delete iterator;
   }
 }
 
 extern "C" int
-rocksdb_delete_range (rocksdb_t *db, rocksdb_delete_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_delete_range_cb cb) {
+rocksdb_delete_range (rocksdb_t *db, rocksdb_delete_range_t *req, rocksdb_range_t range, rocksdb_delete_range_cb cb) {
   req->db = db;
-  req->start = start;
-  req->end = end;
+  req->range = range;
   req->cb = cb;
 
   req->worker.data = static_cast<void *>(req);
@@ -363,9 +508,9 @@ rocksdb__on_iterator_open (uv_work_t *handle) {
 }
 
 extern "C" int
-rocksdb_iterator_open (rocksdb_iterator_t *iterator, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_iterator_cb cb) {
-  iterator->start = start;
-  iterator->end = end;
+rocksdb_iterator_open (rocksdb_iterator_t *iterator, rocksdb_range_t range, bool reverse, rocksdb_iterator_cb cb) {
+  iterator->range = range;
+  iterator->reverse = reverse;
   iterator->cb = cb;
 
   return uv_queue_work(iterator->db->loop, &iterator->worker, rocksdb__on_iterator_open, rocksdb__on_after_iterator);
@@ -393,9 +538,7 @@ rocksdb__on_iterator_refresh (uv_work_t *handle) {
 
   auto iterator = reinterpret_cast<Iterator *>(req->handle);
 
-  iterator->Refresh();
-
-  rocksdb__iterator_seek(iterator, req);
+  rocksdb__iterator_refresh(iterator, req);
 
   auto status = iterator->status();
 
@@ -407,9 +550,9 @@ rocksdb__on_iterator_refresh (uv_work_t *handle) {
 }
 
 extern "C" int
-rocksdb_iterator_refresh (rocksdb_iterator_t *iterator, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_iterator_cb cb) {
-  iterator->start = end;
-  iterator->end = end;
+rocksdb_iterator_refresh (rocksdb_iterator_t *iterator, rocksdb_range_t range, bool reverse, rocksdb_iterator_cb cb) {
+  iterator->range = range;
+  iterator->reverse = reverse;
   iterator->cb = cb;
 
   return uv_queue_work(iterator->db->loop, &iterator->worker, rocksdb__on_iterator_close, rocksdb__on_after_iterator);

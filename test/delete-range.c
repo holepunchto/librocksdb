@@ -77,10 +77,12 @@ on_batch_write (rocksdb_batch_t *req, int status) {
 
   assert(status == 0);
 
-  rocksdb_slice_t start = rocksdb_slice_init("b", 2);
-  rocksdb_slice_t end = rocksdb_slice_init("e", 2);
+  rocksdb_range_t range = {
+    .gte = rocksdb_slice_init("b", 2),
+    .lt = rocksdb_slice_init("e", 2),
+  };
 
-  e = rocksdb_delete_range(&db, &delete_req, start, end, on_delete_range);
+  e = rocksdb_delete_range(&db, &delete_req, range, on_delete_range);
   assert(e == 0);
 }
 

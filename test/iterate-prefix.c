@@ -74,10 +74,12 @@ on_batch_write (rocksdb_batch_t *req, int status) {
 
   assert(status == 0);
 
-  rocksdb_slice_t start = rocksdb_slice_init("a", 2);
-  rocksdb_slice_t end = rocksdb_slice_init("b", 2);
+  rocksdb_range_t range = {
+    .gte = rocksdb_slice_init("a", 2),
+    .lt = rocksdb_slice_init("b", 2),
+  };
 
-  e = rocksdb_iterator_open(&iterator, start, end, on_iterator_open);
+  e = rocksdb_iterator_open(&iterator, range, false, on_iterator_open);
   assert(e == 0);
 }
 

@@ -52,10 +52,12 @@ on_batch_write (rocksdb_batch_t *req, int status) {
 
   assert(status == 0);
 
-  rocksdb_slice_t start = rocksdb_slice_init("b", 2);
-  rocksdb_slice_t end = rocksdb_slice_init("e", 2);
+  rocksdb_range_t range = {
+    .gte = rocksdb_slice_init("b", 2),
+    .lt = rocksdb_slice_init("e", 2)
+  };
 
-  e = rocksdb_read_range(&db, &read_req, start, end, keys, values, 5, on_read_range);
+  e = rocksdb_read_range(&db, &read_req, range, false, keys, values, 5, on_read_range);
   assert(e == 0);
 }
 

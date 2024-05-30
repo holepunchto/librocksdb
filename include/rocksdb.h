@@ -13,6 +13,7 @@ typedef struct rocksdb_options_s rocksdb_options_t;
 typedef struct rocksdb_open_s rocksdb_open_t;
 typedef struct rocksdb_close_s rocksdb_close_t;
 typedef struct rocksdb_slice_s rocksdb_slice_t;
+typedef struct rocksdb_range_s rocksdb_range_t;
 typedef struct rocksdb_read_range_s rocksdb_read_range_t;
 typedef struct rocksdb_delete_range_s rocksdb_delete_range_t;
 typedef struct rocksdb_iterator_s rocksdb_iterator_t;
@@ -107,13 +108,21 @@ struct rocksdb_slice_s {
   size_t len;
 };
 
+struct rocksdb_range_s {
+  rocksdb_slice_t gt;
+  rocksdb_slice_t gte;
+
+  rocksdb_slice_t lt;
+  rocksdb_slice_t lte;
+};
+
 struct rocksdb_read_range_s {
   uv_work_t worker;
 
   rocksdb_t *db;
 
-  rocksdb_slice_t start;
-  rocksdb_slice_t end;
+  rocksdb_range_t range;
+  bool reverse;
 
   size_t len;
   size_t capacity;
@@ -133,8 +142,7 @@ struct rocksdb_delete_range_s {
 
   rocksdb_t *db;
 
-  rocksdb_slice_t start;
-  rocksdb_slice_t end;
+  rocksdb_range_t range;
 
   char *error;
 
@@ -150,8 +158,8 @@ struct rocksdb_iterator_s {
 
   void *handle; // Opaque iterator pointer
 
-  rocksdb_slice_t start;
-  rocksdb_slice_t end;
+  rocksdb_range_t range;
+  bool reverse;
 
   size_t len;
   size_t capacity;
@@ -214,22 +222,22 @@ rocksdb_slice_t
 rocksdb_slice_empty (void);
 
 int
-rocksdb_read_range (rocksdb_t *db, rocksdb_read_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_read_range_cb cb);
+rocksdb_read_range (rocksdb_t *db, rocksdb_read_range_t *req, rocksdb_range_t range, bool reverse, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_read_range_cb cb);
 
 int
-rocksdb_delete_range (rocksdb_t *db, rocksdb_delete_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_delete_range_cb cb);
+rocksdb_delete_range (rocksdb_t *db, rocksdb_delete_range_t *req, rocksdb_range_t range, rocksdb_delete_range_cb cb);
 
 int
 rocksdb_iterator_init (rocksdb_t *db, rocksdb_iterator_t *iterator);
 
 int
-rocksdb_iterator_open (rocksdb_iterator_t *iterator, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_iterator_cb cb);
+rocksdb_iterator_open (rocksdb_iterator_t *iterator, rocksdb_range_t range, bool reverse, rocksdb_iterator_cb cb);
 
 int
 rocksdb_iterator_close (rocksdb_iterator_t *iterator, rocksdb_iterator_cb cb);
 
 int
-rocksdb_iterator_refresh (rocksdb_iterator_t *iterator, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_iterator_cb cb);
+rocksdb_iterator_refresh (rocksdb_iterator_t *iterator, rocksdb_range_t range, bool reverse, rocksdb_iterator_cb cb);
 
 int
 rocksdb_iterator_read (rocksdb_iterator_t *iterator, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb);
