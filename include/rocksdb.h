@@ -14,7 +14,6 @@ typedef struct rocksdb_open_s rocksdb_open_t;
 typedef struct rocksdb_close_s rocksdb_close_t;
 typedef struct rocksdb_slice_s rocksdb_slice_t;
 typedef struct rocksdb_range_s rocksdb_range_t;
-typedef struct rocksdb_read_range_s rocksdb_read_range_t;
 typedef struct rocksdb_delete_range_s rocksdb_delete_range_t;
 typedef struct rocksdb_iterator_s rocksdb_iterator_t;
 typedef struct rocksdb_batch_s rocksdb_batch_t;
@@ -22,7 +21,6 @@ typedef struct rocksdb_s rocksdb_t;
 
 typedef void (*rocksdb_open_cb)(rocksdb_open_t *req, int status);
 typedef void (*rocksdb_close_cb)(rocksdb_close_t *req, int status);
-typedef void (*rocksdb_read_range_cb)(rocksdb_read_range_t *req, int status);
 typedef void (*rocksdb_delete_range_cb)(rocksdb_delete_range_t *req, int status);
 typedef void (*rocksdb_iterator_cb)(rocksdb_iterator_t *iterator, int status);
 typedef void (*rocksdb_batch_cb)(rocksdb_batch_t *batch, int status);
@@ -116,27 +114,6 @@ struct rocksdb_range_s {
   rocksdb_slice_t lte;
 };
 
-struct rocksdb_read_range_s {
-  uv_work_t worker;
-
-  rocksdb_t *db;
-
-  rocksdb_range_t range;
-  bool reverse;
-
-  size_t len;
-  size_t capacity;
-
-  rocksdb_slice_t *keys;
-  rocksdb_slice_t *values;
-
-  char *error;
-
-  rocksdb_read_range_cb cb;
-
-  void *data;
-};
-
 struct rocksdb_delete_range_s {
   uv_work_t worker;
 
@@ -220,9 +197,6 @@ rocksdb_slice_destroy (rocksdb_slice_t *slice);
 
 rocksdb_slice_t
 rocksdb_slice_empty (void);
-
-int
-rocksdb_read_range (rocksdb_t *db, rocksdb_read_range_t *req, rocksdb_range_t range, bool reverse, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_read_range_cb cb);
 
 int
 rocksdb_delete_range (rocksdb_t *db, rocksdb_delete_range_t *req, rocksdb_range_t range, rocksdb_delete_range_cb cb);

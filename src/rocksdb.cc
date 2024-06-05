@@ -367,52 +367,6 @@ rocksdb__iterator_refresh (Iterator *iterator, T *req) {
 }
 
 static void
-rocksdb__on_after_read_range (uv_work_t *handle, int status) {
-  auto req = reinterpret_cast<rocksdb_read_range_t *>(handle->data);
-
-  auto error = req->error;
-
-  req->cb(req, status);
-
-  if (error) free(error);
-}
-
-static void
-rocksdb__on_read_range (uv_work_t *handle) {
-  auto req = reinterpret_cast<rocksdb_read_range_t *>(handle->data);
-
-  auto iterator = rocksdb__iterator_open(req);
-
-  rocksdb__iterator_read(iterator, req);
-
-  auto status = iterator->status();
-
-  if (status.ok()) {
-    req->error = nullptr;
-  } else {
-    req->error = strdup(status.getState());
-  }
-
-  delete iterator;
-}
-
-extern "C" int
-rocksdb_read_range (rocksdb_t *db, rocksdb_read_range_t *req, rocksdb_range_t range, bool reverse, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_read_range_cb cb) {
-  req->db = db;
-  req->range = range;
-  req->reverse = reverse;
-  req->keys = keys;
-  req->values = values;
-  req->len = 0;
-  req->capacity = capacity;
-  req->cb = cb;
-
-  req->worker.data = static_cast<void *>(req);
-
-  return uv_queue_work(db->loop, &req->worker, rocksdb__on_read_range, rocksdb__on_after_read_range);
-}
-
-static void
 rocksdb__on_after_delete_range (uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_delete_range_t *>(handle->data);
 
