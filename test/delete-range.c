@@ -8,36 +8,26 @@ static uv_loop_t *loop;
 
 static rocksdb_t db;
 
-static rocksdb_open_t open_req;
-static rocksdb_close_t close_req;
-static rocksdb_delete_range_t delete_req;
-
-static rocksdb_batch_t batch;
-
-static rocksdb_slice_t keys[5];
-static rocksdb_slice_t values[5];
-static char *errors[5];
-
 static void
 on_close (rocksdb_close_t *req, int status) {
   assert(status == 0);
 }
 
 static void
-on_batch_read (rocksdb_batch_t *req, int status) {
+on_read (rocksdb_read_batch_t *req, int status) {
   int e;
 
   assert(status == 0);
 
-#define V(i, value) \
-  assert(errors[i] == NULL); \
+#define V(i, v) \
+  assert(req->errors[i] == NULL); \
 \
-  if (value) { \
-    assert(strcmp(values[i].data, value) == 0); \
+  if (v) { \
+    assert(strcmp(req->reads[i].value.data, v) == 0); \
 \
-    rocksdb_slice_destroy(&values[i]); \
+    rocksdb_slice_destroy(&req->reads[i].value); \
   } else { \
-    assert(values[i].len == 0); \
+    assert(req->reads[i].value.len == 0); \
   }
 
   V(0, "a")
@@ -47,18 +37,22 @@ on_batch_read (rocksdb_batch_t *req, int status) {
   V(4, "e")
 #undef V
 
-  e = rocksdb_close(&db, &close_req, on_close);
+  static rocksdb_close_t close;
+  e = rocksdb_close(&db, &close, on_close);
   assert(e == 0);
 }
 
 static void
-on_delete_range (rocksdb_delete_range_t *req, int status) {
+on_delete (rocksdb_write_batch_t *req, int status) {
   int e;
 
   assert(status == 0);
 
-#define V(i, key) \
-  keys[i] = rocksdb_slice_init(key, 2);
+  static rocksdb_read_t reads[5];
+
+#define V(i, k) \
+  reads[i].type = rocksdb_get; \
+  reads[i].key = rocksdb_slice_init(k, 2);
 
   V(0, "a")
   V(1, "b")
@@ -67,22 +61,26 @@ on_delete_range (rocksdb_delete_range_t *req, int status) {
   V(4, "e")
 #undef V
 
-  e = rocksdb_batch_read(&batch, keys, values, errors, 5, on_batch_read);
+  static char *errors[5];
+
+  static rocksdb_read_batch_t batch;
+  e = rocksdb_read(&db, &batch, reads, errors, 5, on_read);
   assert(e == 0);
 }
 
 static void
-on_batch_write (rocksdb_batch_t *req, int status) {
+on_write (rocksdb_write_batch_t *req, int status) {
   int e;
 
   assert(status == 0);
 
-  rocksdb_range_t range = {
-    .gte = rocksdb_slice_init("b", 2),
-    .lt = rocksdb_slice_init("e", 2),
-  };
+  static rocksdb_write_t write;
+  write.type = rocksdb_delete_range;
+  write.start = rocksdb_slice_init("b", 2);
+  write.end = rocksdb_slice_init("e", 2);
 
-  e = rocksdb_delete_range(&db, &delete_req, range, on_delete_range);
+  static rocksdb_write_batch_t batch;
+  e = rocksdb_write(&db, &batch, &write, 1, on_delete);
   assert(e == 0);
 }
 
@@ -92,9 +90,12 @@ on_open (rocksdb_open_t *req, int status) {
 
   assert(status == 0);
 
-#define V(i, key) \
-  keys[i] = rocksdb_slice_init(key, 2); \
-  values[i] = rocksdb_slice_init(key, 2);
+  static rocksdb_write_t writes[5];
+
+#define V(i, k) \
+  writes[i].type = rocksdb_put; \
+  writes[i].key = rocksdb_slice_init(k, 2); \
+  writes[i].value = rocksdb_slice_init(k, 2);
 
   V(0, "a")
   V(1, "b")
@@ -103,7 +104,8 @@ on_open (rocksdb_open_t *req, int status) {
   V(4, "e")
 #undef V
 
-  e = rocksdb_batch_write(&batch, keys, values, 5, on_batch_write);
+  static rocksdb_write_batch_t batch;
+  e = rocksdb_write(&db, &batch, writes, 5, on_write);
   assert(e == 0);
 }
 
@@ -116,14 +118,12 @@ main () {
   e = rocksdb_init(loop, &db);
   assert(e == 0);
 
-  e = rocksdb_batch_init(&db, &batch);
-  assert(e == 0);
-
   rocksdb_options_t options = {
     .create_if_missing = true,
   };
 
-  e = rocksdb_open(&db, &open_req, "test/fixtures/delete-range.db", &options, on_open);
+  static rocksdb_open_t open;
+  e = rocksdb_open(&db, &open, "test/fixtures/delete-range.db", &options, on_open);
   assert(e == 0);
 
   e = uv_run(loop, UV_RUN_DEFAULT);

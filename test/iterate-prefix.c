@@ -8,15 +8,6 @@ static uv_loop_t *loop;
 
 static rocksdb_t db;
 
-static rocksdb_open_t open_req;
-static rocksdb_close_t close_req;
-
-static rocksdb_batch_t batch;
-static rocksdb_iterator_t iterator;
-
-static rocksdb_slice_t keys[8];
-static rocksdb_slice_t values[8];
-
 static void
 on_close (rocksdb_close_t *req, int status) {
   assert(status == 0);
@@ -28,7 +19,8 @@ on_iterator_close (rocksdb_iterator_t *req, int status) {
 
   assert(status == 0);
 
-  e = rocksdb_close(&db, &close_req, on_close);
+  static rocksdb_close_t close;
+  e = rocksdb_close(&db, &close, on_close);
   assert(e == 0);
 }
 
@@ -41,12 +33,12 @@ on_iterator_read (rocksdb_iterator_t *req, int status) {
   assert(req->len == 4);
   assert(req->error == NULL);
 
-#define V(i, key) \
-  assert(strcmp(keys[i].data, key) == 0); \
-  assert(strcmp(values[i].data, key) == 0); \
+#define V(i, k) \
+  assert(strcmp(req->keys[i].data, k) == 0); \
+  assert(strcmp(req->values[i].data, k) == 0); \
 \
-  rocksdb_slice_destroy(&keys[i]); \
-  rocksdb_slice_destroy(&values[i]);
+  rocksdb_slice_destroy(&req->keys[i]); \
+  rocksdb_slice_destroy(&req->values[i]);
 
   V(0, "aa")
   V(1, "ab")
@@ -54,7 +46,7 @@ on_iterator_read (rocksdb_iterator_t *req, int status) {
   V(3, "ad")
 #undef V
 
-  e = rocksdb_iterator_close(&iterator, on_iterator_close);
+  e = rocksdb_iterator_close(req, on_iterator_close);
   assert(e == 0);
 }
 
@@ -64,12 +56,15 @@ on_iterator_open (rocksdb_iterator_t *req, int status) {
 
   assert(status == 0);
 
-  e = rocksdb_iterator_read(&iterator, keys, values, 4, on_iterator_read);
+  static rocksdb_slice_t keys[4];
+  static rocksdb_slice_t values[4];
+
+  e = rocksdb_iterator_read(req, keys, values, 4, on_iterator_read);
   assert(e == 0);
 }
 
 static void
-on_batch_write (rocksdb_batch_t *req, int status) {
+on_write (rocksdb_write_batch_t *req, int status) {
   int e;
 
   assert(status == 0);
@@ -79,7 +74,8 @@ on_batch_write (rocksdb_batch_t *req, int status) {
     .lt = rocksdb_slice_init("b", 2),
   };
 
-  e = rocksdb_iterator_open(&iterator, range, false, on_iterator_open);
+  static rocksdb_iterator_t iterator;
+  e = rocksdb_iterator_open(&db, &iterator, range, false, on_iterator_open);
   assert(e == 0);
 }
 
@@ -89,9 +85,12 @@ on_open (rocksdb_open_t *req, int status) {
 
   assert(status == 0);
 
-#define V(i, key) \
-  keys[i] = rocksdb_slice_init(key, 3); \
-  values[i] = rocksdb_slice_init(key, 3);
+  static rocksdb_write_t writes[8];
+
+#define V(i, k) \
+  writes[i].type = rocksdb_put; \
+  writes[i].key = rocksdb_slice_init(k, 3); \
+  writes[i].value = rocksdb_slice_init(k, 3);
 
   V(0, "aa")
   V(1, "ab")
@@ -103,7 +102,8 @@ on_open (rocksdb_open_t *req, int status) {
   V(7, "ad")
 #undef V
 
-  e = rocksdb_batch_write(&batch, keys, values, 8, on_batch_write);
+  static rocksdb_write_batch_t batch;
+  e = rocksdb_write(&db, &batch, writes, 8, on_write);
   assert(e == 0);
 }
 
@@ -116,17 +116,12 @@ main () {
   e = rocksdb_init(loop, &db);
   assert(e == 0);
 
-  e = rocksdb_batch_init(&db, &batch);
-  assert(e == 0);
-
-  e = rocksdb_iterator_init(&db, &iterator);
-  assert(e == 0);
-
   rocksdb_options_t options = {
     .create_if_missing = true,
   };
 
-  e = rocksdb_open(&db, &open_req, "test/fixtures/iterate-prefix.db", &options, on_open);
+  static rocksdb_open_t open;
+  e = rocksdb_open(&db, &open, "test/fixtures/iterate-prefix.db", &options, on_open);
   assert(e == 0);
 
   e = uv_run(loop, UV_RUN_DEFAULT);

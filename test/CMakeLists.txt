@@ -2,7 +2,7 @@ list(APPEND tests
   delete-range
   iterate-prefix
   open-close
-  write-read-batch
+  write-read
 )
 
 foreach(test IN LISTS tests)

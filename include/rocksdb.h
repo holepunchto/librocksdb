@@ -14,16 +14,18 @@ typedef struct rocksdb_open_s rocksdb_open_t;
 typedef struct rocksdb_close_s rocksdb_close_t;
 typedef struct rocksdb_slice_s rocksdb_slice_t;
 typedef struct rocksdb_range_s rocksdb_range_t;
-typedef struct rocksdb_delete_range_s rocksdb_delete_range_t;
 typedef struct rocksdb_iterator_s rocksdb_iterator_t;
-typedef struct rocksdb_batch_s rocksdb_batch_t;
+typedef struct rocksdb_read_s rocksdb_read_t;
+typedef struct rocksdb_read_batch_s rocksdb_read_batch_t;
+typedef struct rocksdb_write_s rocksdb_write_t;
+typedef struct rocksdb_write_batch_s rocksdb_write_batch_t;
 typedef struct rocksdb_s rocksdb_t;
 
 typedef void (*rocksdb_open_cb)(rocksdb_open_t *req, int status);
 typedef void (*rocksdb_close_cb)(rocksdb_close_t *req, int status);
-typedef void (*rocksdb_delete_range_cb)(rocksdb_delete_range_t *req, int status);
 typedef void (*rocksdb_iterator_cb)(rocksdb_iterator_t *iterator, int status);
-typedef void (*rocksdb_batch_cb)(rocksdb_batch_t *batch, int status);
+typedef void (*rocksdb_read_batch_cb)(rocksdb_read_batch_t *batch, int status);
+typedef void (*rocksdb_write_batch_cb)(rocksdb_write_batch_t *batch, int status);
 
 typedef enum {
   rocksdb_compaction_style_level = 0,
@@ -114,20 +116,6 @@ struct rocksdb_range_s {
   rocksdb_slice_t lte;
 };
 
-struct rocksdb_delete_range_s {
-  uv_work_t worker;
-
-  rocksdb_t *db;
-
-  rocksdb_range_t range;
-
-  char *error;
-
-  rocksdb_delete_range_cb cb;
-
-  void *data;
-};
-
 struct rocksdb_iterator_s {
   uv_work_t worker;
 
@@ -151,25 +139,74 @@ struct rocksdb_iterator_s {
   void *data;
 };
 
-struct rocksdb_batch_s {
+typedef enum {
+  rocksdb_get = 1,
+} rocksdb_read_type_t;
+
+struct rocksdb_read_s {
+  rocksdb_read_type_t type;
+
+  union {
+    // For get
+    struct {
+      rocksdb_slice_t key;
+      rocksdb_slice_t value;
+    };
+  };
+};
+
+struct rocksdb_read_batch_s {
   uv_work_t worker;
 
   rocksdb_t *db;
 
   size_t len;
 
-  const rocksdb_slice_t *keys;
-  rocksdb_slice_t *values;
+  rocksdb_read_t *reads;
+
+  char **errors;
+
+  rocksdb_read_batch_cb cb;
+
+  void *data;
+};
+
+typedef enum {
+  rocksdb_put = 1,
+  rocksdb_delete,
+  rocksdb_delete_range,
+} rocksdb_write_type_t;
+
+struct rocksdb_write_s {
+  rocksdb_write_type_t type;
 
   union {
-    // A single error for the write or delete batch.
-    char *error;
+    // For put, delete
+    struct {
+      rocksdb_slice_t key;
+      rocksdb_slice_t value;
+    };
 
-    // A list of errors for the read batch.
-    char **errors;
+    // For delete_range
+    struct {
+      rocksdb_slice_t start;
+      rocksdb_slice_t end;
+    };
   };
+};
 
-  rocksdb_batch_cb cb;
+struct rocksdb_write_batch_s {
+  uv_work_t worker;
+
+  rocksdb_t *db;
+
+  size_t len;
+
+  rocksdb_write_t *writes;
+
+  char *error;
+
+  rocksdb_write_batch_cb cb;
 
   void *data;
 };
@@ -199,13 +236,7 @@ rocksdb_slice_t
 rocksdb_slice_empty (void);
 
 int
-rocksdb_delete_range (rocksdb_t *db, rocksdb_delete_range_t *req, rocksdb_range_t range, rocksdb_delete_range_cb cb);
-
-int
-rocksdb_iterator_init (rocksdb_t *db, rocksdb_iterator_t *iterator);
-
-int
-rocksdb_iterator_open (rocksdb_iterator_t *iterator, rocksdb_range_t range, bool reverse, rocksdb_iterator_cb cb);
+rocksdb_iterator_open (rocksdb_t *db, rocksdb_iterator_t *iterator, rocksdb_range_t range, bool reverse, rocksdb_iterator_cb cb);
 
 int
 rocksdb_iterator_close (rocksdb_iterator_t *iterator, rocksdb_iterator_cb cb);
@@ -217,16 +248,10 @@ int
 rocksdb_iterator_read (rocksdb_iterator_t *iterator, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb);
 
 int
-rocksdb_batch_init (rocksdb_t *db, rocksdb_batch_t *batch);
+rocksdb_read (rocksdb_t *db, rocksdb_read_batch_t *batch, rocksdb_read_t *reads, char **errors, size_t len, rocksdb_read_batch_cb cb);
 
 int
-rocksdb_batch_read (rocksdb_batch_t *batch, const rocksdb_slice_t *keys, rocksdb_slice_t *values, char **errors, size_t len, rocksdb_batch_cb cb);
-
-int
-rocksdb_batch_write (rocksdb_batch_t *batch, const rocksdb_slice_t *keys, const rocksdb_slice_t *values, size_t len, rocksdb_batch_cb cb);
-
-int
-rocksdb_batch_delete (rocksdb_batch_t *batch, const rocksdb_slice_t *keys, size_t len, rocksdb_batch_cb cb);
+rocksdb_write (rocksdb_t *db, rocksdb_write_batch_t *batch, rocksdb_write_t *writes, size_t len, rocksdb_write_batch_cb cb);
 
 #ifdef __cplusplus
 }
