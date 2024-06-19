@@ -226,7 +226,7 @@ int
 rocksdb_batch_write (rocksdb_batch_t *batch, const rocksdb_slice_t *keys, const rocksdb_slice_t *values, size_t len, rocksdb_batch_cb cb);
 
 int
-rocksdb_batch_delete (rocksdb_batch_t *batch, const rocksdb_slice_t *keys, const rocksdb_slice_t *values, size_t len, rocksdb_batch_cb cb);
+rocksdb_batch_delete (rocksdb_batch_t *batch, const rocksdb_slice_t *keys, size_t len, rocksdb_batch_cb cb);
 
 #ifdef __cplusplus
 }

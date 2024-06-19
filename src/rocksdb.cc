@@ -684,9 +684,8 @@ rocksdb__on_batch_delete (uv_work_t *handle) {
 }
 
 extern "C" int
-rocksdb_batch_delete (rocksdb_batch_t *batch, const rocksdb_slice_t *keys, const rocksdb_slice_t *values, size_t len, rocksdb_batch_cb cb) {
+rocksdb_batch_delete (rocksdb_batch_t *batch, const rocksdb_slice_t *keys, size_t len, rocksdb_batch_cb cb) {
   batch->keys = keys;
-  batch->values = const_cast<rocksdb_slice_t *>(values);
   batch->error = nullptr;
   batch->len = len;
   batch->cb = cb;
