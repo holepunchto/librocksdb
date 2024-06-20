@@ -14,6 +14,22 @@ jobs:
         - os: ubuntu-latest
           platform: linux
           arch: x64
+        - os: ubuntu-latest
+          platform: android
+          arch: x64
+          flags: --android-ndk 26.1.10909125 --android-api 34
+        - os: ubuntu-latest
+          platform: android
+          arch: ia32
+          flags: --android-ndk 26.1.10909125 --android-api 34
+        - os: ubuntu-latest
+          platform: android
+          arch: arm64
+          flags: --android-ndk 26.1.10909125 --android-api 34
+        - os: ubuntu-latest
+          platform: android
+          arch: arm
+          flags: --android-ndk 26.1.10909125 --android-api 34
         - os: macos-latest
           platform: darwin
           arch: arm64
