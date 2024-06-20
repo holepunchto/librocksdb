@@ -17,6 +17,10 @@ jobs:
         - os: macos-latest
           platform: darwin
           arch: arm64
+        - os: macos-latest
+          platform: ios
+          arch: arm64
+          flags: --simulator
         - os: windows-latest
           platform: win32
           arch: x64
@@ -30,6 +34,7 @@ jobs:
       with:
         node-version: lts/*
     - run: npm install -g bare-dev
-    - run: bare-dev configure --debug --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
+    - run: bare-dev configure --debug --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} ${{ matrix.flags }}
     - run: bare-dev build --debug
     - run: bare-dev test --debug
+      if: ${{ matrix.platform == 'linux' || matrix.platform == 'darwin' || matrix.platform == 'win32' }}
