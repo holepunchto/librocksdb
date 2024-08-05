@@ -44,7 +44,7 @@ on_write (rocksdb_write_batch_t *req, int status) {
   static char *error;
 
   static rocksdb_read_batch_t batch;
-  e = rocksdb_read(&db, &batch, &read, &error, 1, on_read);
+  e = rocksdb_read(&db, &batch, &read, &error, 1, NULL, on_read);
   assert(e == 0);
 }
 
@@ -60,7 +60,7 @@ on_open (rocksdb_open_t *req, int status) {
   write.value = rocksdb_slice_init("world", 6);
 
   static rocksdb_write_batch_t batch;
-  e = rocksdb_write(&db, &batch, &write, 1, on_write);
+  e = rocksdb_write(&db, &batch, &write, 1, NULL, on_write);
   assert(e == 0);
 }
 

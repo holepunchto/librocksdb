@@ -64,7 +64,7 @@ on_delete (rocksdb_write_batch_t *req, int status) {
   static char *errors[5];
 
   static rocksdb_read_batch_t batch;
-  e = rocksdb_read(&db, &batch, reads, errors, 5, on_read);
+  e = rocksdb_read(&db, &batch, reads, errors, 5, NULL, on_read);
   assert(e == 0);
 }
 
@@ -84,7 +84,7 @@ on_write (rocksdb_write_batch_t *req, int status) {
   writes[1].key = rocksdb_slice_init("e", 2);
 
   static rocksdb_write_batch_t batch;
-  e = rocksdb_write(&db, &batch, writes, 2, on_delete);
+  e = rocksdb_write(&db, &batch, writes, 2, NULL, on_delete);
   assert(e == 0);
 }
 
@@ -109,7 +109,7 @@ on_open (rocksdb_open_t *req, int status) {
 #undef V
 
   static rocksdb_write_batch_t batch;
-  e = rocksdb_write(&db, &batch, writes, 5, on_write);
+  e = rocksdb_write(&db, &batch, writes, 5, NULL, on_write);
   assert(e == 0);
 }
 

@@ -17,6 +17,8 @@ using namespace rocksdb;
 
 static_assert(sizeof(Slice) == sizeof(rocksdb_slice_t));
 
+namespace {
+
 static const rocksdb_options_t rocksdb__default_options = {
   .version = 0,
   .read_only = false,
@@ -33,11 +35,34 @@ static const rocksdb_options_t rocksdb__default_options = {
   .table_format_version = 6,
 };
 
+static const rocksdb_read_options_t rocksdb__default_read_options = {
+  .version = 0,
+  .snapshot = nullptr,
+};
+
+static const rocksdb_write_options_t rocksdb__default_write_options = {
+  .version = 0,
+};
+
 template <auto rocksdb_options_t::*P, typename T>
 static inline T
 rocksdb__option (const rocksdb_options_t *options, int min_version, T fallback = T(rocksdb__default_options.*P)) {
   return options->version >= min_version ? T(options->*P) : fallback;
 }
+
+template <auto rocksdb_read_options_t::*P, typename T>
+static inline T
+rocksdb__option (const rocksdb_read_options_t *options, int min_version, T fallback = T(rocksdb__default_read_options.*P)) {
+  return options->version >= min_version ? T(options->*P) : fallback;
+}
+
+template <auto rocksdb_write_options_t::*P, typename T>
+static inline T
+rocksdb__option (const rocksdb_write_options_t *options, int min_version, T fallback = T(rocksdb__default_write_options.*P)) {
+  return options->version >= min_version ? T(options->*P) : fallback;
+}
+
+} // namespace
 
 extern "C" int
 rocksdb_init (uv_loop_t *loop, rocksdb_t *db) {
@@ -46,6 +71,8 @@ rocksdb_init (uv_loop_t *loop, rocksdb_t *db) {
 
   return 0;
 }
+
+namespace {
 
 template <typename T>
 static inline void
@@ -58,6 +85,8 @@ rocksdb__on_status (uv_work_t *handle, int status) {
 
   if (error) free(error);
 }
+
+} // namespace
 
 static void
 rocksdb__on_open (uv_work_t *handle) {
@@ -146,6 +175,8 @@ rocksdb_open (rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksd
   return uv_queue_work(db->loop, &req->worker, rocksdb__on_open, rocksdb__on_status<rocksdb_open_t>);
 }
 
+namespace {
+
 static void
 rocksdb__on_close (uv_work_t *handle) {
   auto req = reinterpret_cast<rocksdb_close_t *>(handle->data);
@@ -164,6 +195,8 @@ rocksdb__on_close (uv_work_t *handle) {
 
   delete rocks;
 }
+
+} // namespace
 
 extern "C" int
 rocksdb_close (rocksdb_t *db, rocksdb_close_t *req, rocksdb_close_cb cb) {
@@ -190,6 +223,8 @@ extern "C" rocksdb_slice_t
 rocksdb_slice_empty (void) {
   return {.data = nullptr, .len = 0};
 }
+
+namespace {
 
 static inline rocksdb_slice_t
 rocksdb__slice_copy (const Slice &slice) {
@@ -323,8 +358,8 @@ rocksdb__iterator_valid (Iterator *iterator, T *req) {
 
 template <bool reverse = false>
 static inline Iterator *
-rocksdb__iterator_open (DB *db, const rocksdb_range_t &range) {
-  auto iterator = db->NewIterator(ReadOptions());
+rocksdb__iterator_open (DB *db, const ReadOptions &options, const rocksdb_range_t &range) {
+  auto iterator = db->NewIterator(options);
 
   rocksdb__iterator_seek<reverse>(iterator, range);
 
@@ -338,10 +373,18 @@ rocksdb__iterator_open (T *req) {
 
   const auto &range = req->range;
 
+  auto snapshot = rocksdb__option<&rocksdb_read_options_t::snapshot, rocksdb_snapshot_t *>(
+    &req->options, 0
+  );
+
+  ReadOptions options;
+
+  if (snapshot) options.snapshot = reinterpret_cast<const Snapshot *>(snapshot->handle);
+
   if (req->reverse) {
-    return rocksdb__iterator_open<true>(db, range);
+    return rocksdb__iterator_open<true>(db, options, range);
   } else {
-    return rocksdb__iterator_open<false>(db, range);
+    return rocksdb__iterator_open<false>(db, options, range);
   }
 }
 
@@ -365,6 +408,10 @@ rocksdb__iterator_refresh (Iterator *iterator, T *req) {
 
   rocksdb__iterator_seek(iterator, req);
 }
+
+} // namespace
+
+namespace {
 
 static void
 rocksdb__on_after_iterator (uv_work_t *handle, int status) {
@@ -394,9 +441,12 @@ rocksdb__on_iterator_open (uv_work_t *handle) {
   }
 }
 
+} // namespace
+
 extern "C" int
-rocksdb_iterator_open (rocksdb_t *db, rocksdb_iterator_t *iterator, rocksdb_range_t range, bool reverse, rocksdb_iterator_cb cb) {
+rocksdb_iterator_open (rocksdb_t *db, rocksdb_iterator_t *iterator, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb) {
   iterator->db = db;
+  iterator->options = options ? *options : rocksdb__default_read_options;
   iterator->range = range;
   iterator->reverse = reverse;
   iterator->cb = cb;
@@ -405,6 +455,8 @@ rocksdb_iterator_open (rocksdb_t *db, rocksdb_iterator_t *iterator, rocksdb_rang
 
   return uv_queue_work(iterator->db->loop, &iterator->worker, rocksdb__on_iterator_open, rocksdb__on_after_iterator);
 }
+
+namespace {
 
 static void
 rocksdb__on_iterator_close (uv_work_t *handle) {
@@ -415,12 +467,16 @@ rocksdb__on_iterator_close (uv_work_t *handle) {
   delete iterator;
 }
 
+} // namespace
+
 extern "C" int
 rocksdb_iterator_close (rocksdb_iterator_t *iterator, rocksdb_iterator_cb cb) {
   iterator->cb = cb;
 
   return uv_queue_work(iterator->db->loop, &iterator->worker, rocksdb__on_iterator_close, rocksdb__on_after_iterator);
 }
+
+namespace {
 
 static void
 rocksdb__on_iterator_refresh (uv_work_t *handle) {
@@ -439,14 +495,19 @@ rocksdb__on_iterator_refresh (uv_work_t *handle) {
   }
 }
 
+} // namespace
+
 extern "C" int
-rocksdb_iterator_refresh (rocksdb_iterator_t *iterator, rocksdb_range_t range, bool reverse, rocksdb_iterator_cb cb) {
+rocksdb_iterator_refresh (rocksdb_iterator_t *iterator, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb) {
+  iterator->options = options ? *options : rocksdb__default_read_options;
   iterator->range = range;
   iterator->reverse = reverse;
   iterator->cb = cb;
 
   return uv_queue_work(iterator->db->loop, &iterator->worker, rocksdb__on_iterator_close, rocksdb__on_after_iterator);
 }
+
+namespace {
 
 static void
 rocksdb__on_iterator_read (uv_work_t *handle) {
@@ -465,6 +526,8 @@ rocksdb__on_iterator_read (uv_work_t *handle) {
   }
 }
 
+} // namespace
+
 extern "C" int
 rocksdb_iterator_read (rocksdb_iterator_t *iterator, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb) {
   iterator->cb = cb;
@@ -475,6 +538,8 @@ rocksdb_iterator_read (rocksdb_iterator_t *iterator, rocksdb_slice_t *keys, rock
 
   return uv_queue_work(iterator->db->loop, &iterator->worker, rocksdb__on_iterator_read, rocksdb__on_after_iterator);
 }
+
+namespace {
 
 static void
 rocksdb__on_after_read (uv_work_t *handle, int status) {
@@ -488,7 +553,7 @@ rocksdb__on_after_read (uv_work_t *handle, int status) {
 }
 
 static void
-rocksdb__on_batch_read (uv_work_t *handle) {
+rocksdb__on_read (uv_work_t *handle) {
   auto req = reinterpret_cast<rocksdb_read_batch_t *>(handle->data);
 
   auto db = reinterpret_cast<DB *>(req->db->handle);
@@ -510,7 +575,15 @@ rocksdb__on_batch_read (uv_work_t *handle) {
 
     std::vector<Status> statuses(req->len);
 
-    db->MultiGet(ReadOptions(), db->DefaultColumnFamily(), req->len, keys.data(), values.data(), statuses.data());
+    auto snapshot = rocksdb__option<&rocksdb_read_options_t::snapshot, rocksdb_snapshot_t *>(
+      &req->options, 0
+    );
+
+    ReadOptions options;
+
+    if (snapshot) options.snapshot = reinterpret_cast<const Snapshot *>(snapshot->handle);
+
+    db->MultiGet(options, db->DefaultColumnFamily(), req->len, keys.data(), values.data(), statuses.data());
 
     for (size_t i = 0, n = req->len; i < n; i++) {
       auto op = &req->reads[i];
@@ -539,9 +612,12 @@ rocksdb__on_batch_read (uv_work_t *handle) {
   }
 }
 
+} // namespace
+
 extern "C" int
-rocksdb_read (rocksdb_t *db, rocksdb_read_batch_t *batch, rocksdb_read_t *reads, char **errors, size_t len, rocksdb_read_batch_cb cb) {
+rocksdb_read (rocksdb_t *db, rocksdb_read_batch_t *batch, rocksdb_read_t *reads, char **errors, size_t len, const rocksdb_read_options_t *options, rocksdb_read_batch_cb cb) {
   batch->db = db;
+  batch->options = options ? *options : rocksdb__default_read_options;
   batch->reads = reads;
   batch->errors = errors;
   batch->len = len;
@@ -549,8 +625,10 @@ rocksdb_read (rocksdb_t *db, rocksdb_read_batch_t *batch, rocksdb_read_t *reads,
 
   batch->worker.data = static_cast<void *>(batch);
 
-  return uv_queue_work(batch->db->loop, &batch->worker, rocksdb__on_batch_read, rocksdb__on_after_read);
+  return uv_queue_work(batch->db->loop, &batch->worker, rocksdb__on_read, rocksdb__on_after_read);
 }
+
+namespace {
 
 static void
 rocksdb__on_after_write (uv_work_t *handle, int status) {
@@ -564,7 +642,7 @@ rocksdb__on_after_write (uv_work_t *handle, int status) {
 }
 
 static void
-rocksdb__on_batch_write (uv_work_t *handle) {
+rocksdb__on_write (uv_work_t *handle) {
   auto req = reinterpret_cast<rocksdb_write_batch_t *>(handle->data);
 
   auto db = reinterpret_cast<DB *>(req->db->handle);
@@ -590,7 +668,9 @@ rocksdb__on_batch_write (uv_work_t *handle) {
       }
     }
 
-    auto status = db->Write(WriteOptions(), &batch);
+    WriteOptions options;
+
+    auto status = db->Write(options, &batch);
 
     if (status.ok()) {
       req->error = nullptr;
@@ -600,9 +680,12 @@ rocksdb__on_batch_write (uv_work_t *handle) {
   }
 }
 
+} // namespace
+
 extern "C" int
-rocksdb_write (rocksdb_t *db, rocksdb_write_batch_t *batch, rocksdb_write_t *writes, size_t len, rocksdb_write_batch_cb cb) {
+rocksdb_write (rocksdb_t *db, rocksdb_write_batch_t *batch, rocksdb_write_t *writes, size_t len, const rocksdb_write_options_t *options, rocksdb_write_batch_cb cb) {
   batch->db = db;
+  batch->options = options ? *options : rocksdb__default_write_options;
   batch->writes = writes;
   batch->error = nullptr;
   batch->len = len;
@@ -610,5 +693,22 @@ rocksdb_write (rocksdb_t *db, rocksdb_write_batch_t *batch, rocksdb_write_t *wri
 
   batch->worker.data = static_cast<void *>(batch);
 
-  return uv_queue_work(batch->db->loop, &batch->worker, rocksdb__on_batch_write, rocksdb__on_after_write);
+  return uv_queue_work(batch->db->loop, &batch->worker, rocksdb__on_write, rocksdb__on_after_write);
+}
+
+extern "C" int
+rocksdb_snapshot_create (rocksdb_t *db, rocksdb_snapshot_t *snapshot) {
+  auto handle = reinterpret_cast<DB *>(db->handle)->GetSnapshot();
+
+  if (handle == nullptr) return -1;
+
+  snapshot->db = db;
+  snapshot->handle = handle;
+
+  return 0;
+}
+
+extern "C" void
+rocksdb_snapshot_destroy (rocksdb_snapshot_t *snapshot) {
+  reinterpret_cast<DB *>(snapshot->db->handle)->ReleaseSnapshot(reinterpret_cast<const Snapshot *>(snapshot->handle));
 }
