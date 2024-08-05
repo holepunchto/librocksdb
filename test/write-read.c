@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdbool.h>
+#include <string.h>
 #include <uv.h>
 
 #include "../include/rocksdb.h"
