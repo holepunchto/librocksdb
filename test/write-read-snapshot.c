@@ -23,9 +23,7 @@ on_second_read (rocksdb_read_batch_t *req, int status) {
 
   assert(req->len == 1);
 
-  rocksdb_read_t read = req->reads[0];
-
-  assert(strcmp(read.value.data, "earth") == 0);
+  assert(strcmp(req->reads[0].value.data, "earth") == 0);
 
   rocksdb_snapshot_destroy(&snapshot);
 
@@ -42,10 +40,9 @@ on_first_read (rocksdb_read_batch_t *req, int status) {
 
   assert(req->len == 1);
 
-  rocksdb_read_t read = req->reads[0];
+  assert(strcmp(req->reads[0].value.data, "world") == 0);
 
-  assert(strcmp(read.value.data, "world") == 0);
-
+  static rocksdb_read_t read;
   read.type = rocksdb_get;
   read.key = rocksdb_slice_init("hello", 5);
   read.value = rocksdb_slice_empty();
