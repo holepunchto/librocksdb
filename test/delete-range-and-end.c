@@ -128,7 +128,7 @@ main () {
   };
 
   static rocksdb_open_t open;
-  e = rocksdb_open(&db, &open, "test/fixtures/delete-range.db", &options, on_open);
+  e = rocksdb_open(&db, &open, "test/fixtures/delete-range-and-end.db", &options, on_open);
   assert(e == 0);
 
   e = uv_run(loop, UV_RUN_DEFAULT);
