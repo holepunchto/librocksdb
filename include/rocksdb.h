@@ -10,6 +10,8 @@ extern "C" {
 #include <uv.h>
 
 typedef struct rocksdb_options_s rocksdb_options_t;
+typedef struct rocksdb_read_options_s rocksdb_read_options_t;
+typedef struct rocksdb_write_options_s rocksdb_write_options_t;
 typedef struct rocksdb_open_s rocksdb_open_t;
 typedef struct rocksdb_close_s rocksdb_close_t;
 typedef struct rocksdb_slice_s rocksdb_slice_t;
@@ -19,6 +21,7 @@ typedef struct rocksdb_read_s rocksdb_read_t;
 typedef struct rocksdb_read_batch_s rocksdb_read_batch_t;
 typedef struct rocksdb_write_s rocksdb_write_t;
 typedef struct rocksdb_write_batch_s rocksdb_write_batch_t;
+typedef struct rocksdb_snapshot_s rocksdb_snapshot_t;
 typedef struct rocksdb_s rocksdb_t;
 
 typedef void (*rocksdb_open_cb)(rocksdb_open_t *req, int status);
@@ -75,6 +78,19 @@ struct rocksdb_options_s {
   uint32_t table_format_version;
 };
 
+/** @version 0 */
+struct rocksdb_read_options_s {
+  int version;
+
+  /** @since 0 */
+  rocksdb_snapshot_t *snapshot;
+};
+
+/** @version 0 */
+struct rocksdb_write_options_s {
+  int version;
+};
+
 struct rocksdb_open_s {
   uv_work_t worker;
 
@@ -121,6 +137,8 @@ struct rocksdb_iterator_s {
 
   rocksdb_t *db;
 
+  rocksdb_read_options_t options;
+
   void *handle; // Opaque iterator pointer
 
   rocksdb_range_t range;
@@ -159,6 +177,8 @@ struct rocksdb_read_batch_s {
   uv_work_t worker;
 
   rocksdb_t *db;
+
+  rocksdb_read_options_t options;
 
   size_t len;
 
@@ -200,6 +220,8 @@ struct rocksdb_write_batch_s {
 
   rocksdb_t *db;
 
+  rocksdb_write_options_t options;
+
   size_t len;
 
   rocksdb_write_t *writes;
@@ -209,6 +231,12 @@ struct rocksdb_write_batch_s {
   rocksdb_write_batch_cb cb;
 
   void *data;
+};
+
+struct rocksdb_snapshot_s {
+  rocksdb_t *db;
+
+  const void *handle; // Opaque snapshot pointer
 };
 
 struct rocksdb_s {
@@ -236,22 +264,28 @@ rocksdb_slice_t
 rocksdb_slice_empty (void);
 
 int
-rocksdb_iterator_open (rocksdb_t *db, rocksdb_iterator_t *iterator, rocksdb_range_t range, bool reverse, rocksdb_iterator_cb cb);
+rocksdb_iterator_open (rocksdb_t *db, rocksdb_iterator_t *iterator, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb);
 
 int
 rocksdb_iterator_close (rocksdb_iterator_t *iterator, rocksdb_iterator_cb cb);
 
 int
-rocksdb_iterator_refresh (rocksdb_iterator_t *iterator, rocksdb_range_t range, bool reverse, rocksdb_iterator_cb cb);
+rocksdb_iterator_refresh (rocksdb_iterator_t *iterator, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb);
 
 int
 rocksdb_iterator_read (rocksdb_iterator_t *iterator, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb);
 
 int
-rocksdb_read (rocksdb_t *db, rocksdb_read_batch_t *batch, rocksdb_read_t *reads, char **errors, size_t len, rocksdb_read_batch_cb cb);
+rocksdb_read (rocksdb_t *db, rocksdb_read_batch_t *batch, rocksdb_read_t *reads, char **errors, size_t len, const rocksdb_read_options_t *options, rocksdb_read_batch_cb cb);
 
 int
-rocksdb_write (rocksdb_t *db, rocksdb_write_batch_t *batch, rocksdb_write_t *writes, size_t len, rocksdb_write_batch_cb cb);
+rocksdb_write (rocksdb_t *db, rocksdb_write_batch_t *batch, rocksdb_write_t *writes, size_t len, const rocksdb_write_options_t *options, rocksdb_write_batch_cb cb);
+
+int
+rocksdb_snapshot_create (rocksdb_t *db, rocksdb_snapshot_t *snapshot);
+
+void
+rocksdb_snapshot_destroy (rocksdb_snapshot_t *snapshot);
 
 #ifdef __cplusplus
 }

@@ -76,7 +76,7 @@ on_write (rocksdb_write_batch_t *req, int status) {
   };
 
   static rocksdb_iterator_t iterator;
-  e = rocksdb_iterator_open(&db, &iterator, range, false, on_iterator_open);
+  e = rocksdb_iterator_open(&db, &iterator, range, false, NULL, on_iterator_open);
   assert(e == 0);
 }
 
@@ -104,7 +104,7 @@ on_open (rocksdb_open_t *req, int status) {
 #undef V
 
   static rocksdb_write_batch_t batch;
-  e = rocksdb_write(&db, &batch, writes, 8, on_write);
+  e = rocksdb_write(&db, &batch, writes, 8, NULL, on_write);
   assert(e == 0);
 }
 
