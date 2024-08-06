@@ -4,6 +4,7 @@ list(APPEND tests
   iterate-prefix
   open-close
   write-read
+  write-read-snapshot
 )
 
 foreach(test IN LISTS tests)
