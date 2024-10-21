@@ -20,6 +20,10 @@ if(NOT TARGET uv)
   add_subdirectory(vendor/libuv EXCLUDE_FROM_ALL)
 endif()
 
+if(NOT TARGET path)
+  add_subdirectory(vendor/libpath EXCLUDE_FROM_ALL)
+endif()
+
 add_library(rocksdb OBJECT)
 
 set_target_properties(
@@ -45,6 +49,7 @@ target_include_directories(
     $<TARGET_PROPERTY:uv,INTERFACE_INCLUDE_DIRECTORIES>
   PRIVATE
     $<TARGET_PROPERTY:rocksdb_facebook,INTERFACE_INCLUDE_DIRECTORIES>
+    $<TARGET_PROPERTY:path,INTERFACE_INCLUDE_DIRECTORIES>
 )
 
 add_library(rocksdb_shared SHARED)
@@ -63,6 +68,7 @@ target_link_libraries(
     rocksdb
   PRIVATE
     rocksdb_facebook
+    path_shared
 )
 
 add_library(rocksdb_static STATIC)
@@ -81,6 +87,7 @@ target_link_libraries(
     rocksdb
   PRIVATE
     rocksdb_facebook
+    path_static
 )
 
 install(TARGETS rocksdb_shared rocksdb_static)

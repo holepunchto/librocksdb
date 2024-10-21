@@ -22,6 +22,8 @@ typedef struct rocksdb_read_batch_s rocksdb_read_batch_t;
 typedef struct rocksdb_write_s rocksdb_write_t;
 typedef struct rocksdb_write_batch_s rocksdb_write_batch_t;
 typedef struct rocksdb_snapshot_s rocksdb_snapshot_t;
+typedef struct rocksdb_fs_mkdir_s rocksdb_fs_mkdir_t;
+typedef struct rocksdb_fs_mkdir_step_s rocksdb_fs_mkdir_step_t;
 typedef struct rocksdb_s rocksdb_t;
 
 typedef void (*rocksdb_open_cb)(rocksdb_open_t *req, int status);
@@ -29,6 +31,7 @@ typedef void (*rocksdb_close_cb)(rocksdb_close_t *req, int status);
 typedef void (*rocksdb_iterator_cb)(rocksdb_iterator_t *iterator, int status);
 typedef void (*rocksdb_read_batch_cb)(rocksdb_read_batch_t *batch, int status);
 typedef void (*rocksdb_write_batch_cb)(rocksdb_write_batch_t *batch, int status);
+typedef void (*rocksdb_fs_mkdir_cb)(rocksdb_fs_mkdir_t *req, int status);
 
 typedef enum {
   rocksdb_compaction_style_level = 0,
@@ -237,6 +240,23 @@ struct rocksdb_snapshot_s {
   rocksdb_t *db;
 
   const void *handle; // Opaque snapshot pointer
+};
+
+struct rocksdb_fs_mkdir_s {
+  uv_fs_t req;
+
+  int mode;
+  char *path;
+
+  void *data;
+};
+
+struct rocksdb_fs_mkdir_step_s {
+  rocksdb_fs_mkdir_t *req;
+
+  char *next;
+
+  const void *handle; // Opaque database pointer
 };
 
 struct rocksdb_s {

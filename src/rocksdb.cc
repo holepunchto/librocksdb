@@ -1,6 +1,7 @@
 #include <memory>
 #include <vector>
 
+#include <path.h>
 #include <rocksdb/advanced_options.h>
 #include <rocksdb/convenience.h>
 #include <rocksdb/db.h>
@@ -161,6 +162,87 @@ rocksdb__on_open (uv_work_t *handle) {
   req->error = status.ok() ? nullptr : strdup(status.getState());
 }
 
+static void
+rocksdb__on_recursive_mkdir (uv_fs_t *req) {
+  rocksdb_fs_mkdir_step_t *step = (rocksdb_fs_mkdir_step_t *) req->data;
+
+  rocksdb_open_t *handle = (rocksdb_open_t *) step->handle;
+
+  int err = req->result;
+
+  switch (err) {
+  case UV_EACCES:
+  case UV_ENOSPC:
+  case UV_ENOTDIR:
+  case UV_EPERM:
+    break;
+
+  case 0: {
+    if (step->next == NULL) break;
+
+    size_t len = strlen(step->next);
+
+    if (len == strlen(step->req->path)) break;
+
+    step->next[len] = '/';
+
+    uv_fs_req_cleanup(req);
+
+    err = uv_fs_mkdir(req->loop, req, step->next, step->req->mode, rocksdb__on_recursive_mkdir);
+    assert(err == 0);
+
+    return;
+  }
+
+  case UV_ENOENT: {
+    size_t dirname = 0;
+
+    path_dirname(req->path, &dirname, path_behavior_system);
+
+    if (dirname == strlen(req->path)) break;
+
+    if (step->next == NULL) {
+      step->next = strdup(step->req->path);
+    }
+
+    step->next[dirname - 1] = '\0';
+
+    uv_fs_req_cleanup(req);
+
+    err = uv_fs_mkdir(req->loop, req, step->next, step->req->mode, rocksdb__on_recursive_mkdir);
+    assert(err == 0);
+
+    return;
+  }
+  }
+
+  uv_fs_req_cleanup(req);
+
+  if (step->next != NULL) free(step->next);
+
+  free(step);
+
+  uv_queue_work(handle->db->loop, &handle->worker, rocksdb__on_open, rocksdb__on_status<rocksdb_open_t>);
+}
+
+static void
+rocksdb__recursive_mkdir (uv_work_t *handle) {
+  auto req = reinterpret_cast<rocksdb_open_t *>(handle->data);
+
+  rocksdb_fs_mkdir_t *mkdir_req = (rocksdb_fs_mkdir_t *) malloc(sizeof(rocksdb_fs_mkdir_t));
+  mkdir_req->mode = 0777;
+  mkdir_req->path = req->path;
+
+  rocksdb_fs_mkdir_step_t *step = (rocksdb_fs_mkdir_step_t *) malloc(sizeof(rocksdb_fs_mkdir_step_t));
+  step->req = mkdir_req;
+  step->next = NULL;
+  step->handle = req;
+
+  mkdir_req->req.data = (void *) step;
+
+  uv_fs_mkdir(req->db->loop, &mkdir_req->req, mkdir_req->path, mkdir_req->mode, rocksdb__on_recursive_mkdir);
+}
+
 extern "C" int
 rocksdb_open (rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, rocksdb_open_cb cb) {
   req->db = db;
@@ -172,7 +254,7 @@ rocksdb_open (rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksd
 
   req->worker.data = static_cast<void *>(req);
 
-  return uv_queue_work(db->loop, &req->worker, rocksdb__on_open, rocksdb__on_status<rocksdb_open_t>);
+  return uv_queue_work(db->loop, &req->worker, rocksdb__recursive_mkdir, NULL);
 }
 
 namespace {
