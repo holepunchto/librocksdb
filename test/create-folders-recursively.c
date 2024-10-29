@@ -6,14 +6,11 @@
 
 static rocksdb_t db;
 
-static bool open_called = false;
-static bool close_called = false;
+static bool folders_created = false;
 
 static void
 on_close (rocksdb_close_t *req, int status) {
   assert(status == 0);
-
-  close_called = true;
 }
 
 static void
@@ -22,7 +19,7 @@ on_open (rocksdb_open_t *req, int status) {
 
   assert(status == 0);
 
-  open_called = true;
+  folders_created = true;
 
   static rocksdb_close_t close;
   e = rocksdb_close(&db, &close, on_close);
@@ -43,11 +40,11 @@ main () {
   };
 
   static rocksdb_open_t open;
-  e = rocksdb_open(&db, &open, "test/fixtures/open-close.db", &options, on_open);
+  e = rocksdb_open(&db, &open, "test/fixtures/foo/bar/baz/create-folders-recursively.db", &options, on_open);
   assert(e == 0);
 
   e = uv_run(loop, UV_RUN_DEFAULT);
   assert(e == 0);
 
-  assert(open_called && close_called);
+  assert(folders_created);
 }
