@@ -9,3 +9,4 @@
 [submodule "vendor/libpath"]
 	path = vendor/libpath
 	url = ../../holepunchto/libpath.git
+	shallow = true
