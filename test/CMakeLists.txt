@@ -1,4 +1,5 @@
 list(APPEND tests
+  create-folders-recursively
   delete-range
   delete-range-and-end
   iterate-prefix
