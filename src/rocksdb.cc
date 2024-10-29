@@ -219,7 +219,7 @@ rocksdb__on_recursive_mkdir (uv_fs_t *req) {
 
   if (data->mkdir_next != NULL) free(data->mkdir_next);
 
-  uv_queue_work(data->db->loop, &data->worker, rocksdb__on_open, rocksdb__on_status<rocksdb_open_t>);
+  uv_queue_work(req->loop, &data->worker, rocksdb__on_open, rocksdb__on_status<rocksdb_open_t>);
 }
 
 static void
@@ -228,7 +228,7 @@ rocksdb__recursive_mkdir (uv_work_t *handle) {
 
   data->mkdir_req.data = data;
 
-  uv_fs_mkdir(data->db->loop, &data->mkdir_req, data->path, 0777, rocksdb__on_recursive_mkdir);
+  uv_fs_mkdir(handle->loop, &data->mkdir_req, data->path, 0777, rocksdb__on_recursive_mkdir);
 }
 
 extern "C" int
