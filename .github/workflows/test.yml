@@ -26,9 +26,9 @@ jobs:
         - os: ubuntu-22.04
           platform: android
           arch: arm64
-        - os: ubuntu-22.04
-          platform: android
-          arch: arm
+        # - os: ubuntu-22.04
+        #   platform: android
+        #   arch: arm
         - os: macos-14
           platform: darwin
           arch: x64
