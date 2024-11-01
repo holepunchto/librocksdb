@@ -105,6 +105,9 @@ struct rocksdb_open_s {
   rocksdb_open_cb cb;
 
   void *data;
+
+  char *mkdir_next;
+  uv_fs_t mkdir_req;
 };
 
 struct rocksdb_close_s {
