@@ -90,9 +90,74 @@ rocksdb__on_status (uv_work_t *handle, int status) {
 } // namespace
 
 static void
+rocksdb__on_recursive_mkdir (uv_fs_t *req) {
+  rocksdb_open_t *data = (rocksdb_open_t *) req->data;
+
+  int err = req->result;
+
+  switch (err) {
+  case UV_EACCES:
+  case UV_ENOSPC:
+  case UV_ENOTDIR:
+  case UV_EPERM:
+    break;
+
+  case 0: {
+    if (data->mkdir_next == NULL) break;
+
+    size_t len = strlen(data->mkdir_next);
+
+    if (len == strlen(data->path)) break;
+
+    data->mkdir_next[len] = '/';
+
+    uv_fs_req_cleanup(req);
+
+    err = uv_fs_mkdir(req->loop, req, data->mkdir_next, 0777, rocksdb__on_recursive_mkdir);
+    assert(err == 0);
+
+    return;
+  }
+
+  case UV_ENOENT: {
+    size_t dirname = 0;
+
+    if (data->mkdir_next == NULL) {
+      data->mkdir_next = strdup(data->path);
+    }
+
+    path_dirname(data->mkdir_next, &dirname, path_behavior_system);
+
+    if (dirname == strlen(data->path)) break;
+
+    data->mkdir_next[dirname - 1] = '\0';
+
+    uv_fs_req_cleanup(req);
+
+    err = uv_fs_mkdir(req->loop, req, data->mkdir_next, 0777, rocksdb__on_recursive_mkdir);
+    assert(err == 0);
+
+    return;
+  }
+
+  default: {
+    uv_fs_req_cleanup(req);
+  }
+  }
+
+  uv_fs_req_cleanup(&data->mkdir_req);
+
+  if (data->mkdir_next != NULL) free(data->mkdir_next);
+}
+
+static void
 rocksdb__on_open (uv_work_t *handle) {
   auto req = reinterpret_cast<rocksdb_open_t *>(handle->data);
 
+  int err = uv_fs_mkdir(handle->loop, &req->mkdir_req, req->path, 0777, rocksdb__on_recursive_mkdir);
+  assert(err == 0);
+
+  /*
   Options options;
 
   options.create_if_missing = rocksdb__option<&rocksdb_options_t::create_if_missing, bool>(
@@ -160,75 +225,7 @@ rocksdb__on_open (uv_work_t *handle) {
   }
 
   req->error = status.ok() ? nullptr : strdup(status.getState());
-}
-
-static void
-rocksdb__on_recursive_mkdir (uv_fs_t *req) {
-  rocksdb_open_t *data = (rocksdb_open_t *) req->data;
-
-  int err = req->result;
-
-  switch (err) {
-  case UV_EACCES:
-  case UV_ENOSPC:
-  case UV_ENOTDIR:
-  case UV_EPERM:
-    break;
-
-  case 0: {
-    if (data->mkdir_next == NULL) break;
-
-    size_t len = strlen(data->mkdir_next);
-
-    if (len == strlen(data->path)) break;
-
-    data->mkdir_next[len] = '/';
-
-    uv_fs_req_cleanup(req);
-
-    err = uv_fs_mkdir(req->loop, req, data->mkdir_next, 0777, rocksdb__on_recursive_mkdir);
-    assert(err == 0);
-
-    return;
-  }
-
-  case UV_ENOENT: {
-    size_t dirname = 0;
-
-    if (data->mkdir_next == NULL) {
-      data->mkdir_next = strdup(data->path);
-    }
-
-    path_dirname(data->mkdir_next, &dirname, path_behavior_system);
-
-    if (dirname == strlen(data->path)) break;
-
-    data->mkdir_next[dirname - 1] = '\0';
-
-    uv_fs_req_cleanup(req);
-
-    err = uv_fs_mkdir(req->loop, &data->mkdir_req, data->mkdir_next, 0777, rocksdb__on_recursive_mkdir);
-
-    assert(err == 0);
-
-    return;
-  }
-  }
-
-  uv_fs_req_cleanup(req);
-
-  if (data->mkdir_next != NULL) free(data->mkdir_next);
-
-  uv_queue_work(req->loop, &data->worker, rocksdb__on_open, rocksdb__on_status<rocksdb_open_t>);
-}
-
-static void
-rocksdb__recursive_mkdir (uv_work_t *handle) {
-  auto data = reinterpret_cast<rocksdb_open_t *>(handle->data);
-
-  data->mkdir_req.data = data;
-
-  uv_fs_mkdir(handle->loop, &data->mkdir_req, data->path, 0777, rocksdb__on_recursive_mkdir);
+  */
 }
 
 extern "C" int
@@ -243,8 +240,9 @@ rocksdb_open (rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksd
   req->mkdir_next = NULL;
 
   req->worker.data = static_cast<void *>(req);
+  req->mkdir_req.data = req;
 
-  return uv_queue_work(db->loop, &req->worker, rocksdb__recursive_mkdir, NULL);
+  return uv_queue_work(db->loop, &req->worker, rocksdb__on_open, rocksdb__on_status<rocksdb_open_t>);
 }
 
 namespace {
