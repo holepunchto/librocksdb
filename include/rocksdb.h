@@ -100,6 +100,9 @@ struct rocksdb_open_s {
 
   char path[4096 + 1 /* NULL */];
 
+  uv_fs_t mkdir;
+  char *mkdir_next;
+
   char *error;
 
   rocksdb_open_cb cb;

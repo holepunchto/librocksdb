@@ -1,6 +1,7 @@
 #include <memory>
 #include <vector>
 
+#include <path.h>
 #include <rocksdb/advanced_options.h>
 #include <rocksdb/convenience.h>
 #include <rocksdb/db.h>
@@ -161,6 +162,64 @@ rocksdb__on_open (uv_work_t *handle) {
   req->error = status.ok() ? nullptr : strdup(status.getState());
 }
 
+static void
+rocksdb__on_mkdir (uv_fs_t *handle) {
+  rocksdb_open_t *req = (rocksdb_open_t *) handle->data;
+
+  int err = handle->result;
+
+  switch (err) {
+  case UV_EACCES:
+  case UV_ENOSPC:
+  case UV_ENOTDIR:
+  case UV_EPERM:
+    break;
+
+  case 0: {
+    if (req->mkdir_next == NULL) break;
+
+    size_t len = strlen(req->mkdir_next);
+
+    if (len == strlen(req->path)) break;
+
+    req->mkdir_next[len] = '/';
+
+    uv_fs_req_cleanup(handle);
+
+    err = uv_fs_mkdir(handle->loop, handle, req->mkdir_next, 0777, rocksdb__on_mkdir);
+    assert(err == 0);
+
+    return;
+  }
+
+  case UV_ENOENT: {
+    size_t dirname = 0;
+
+    if (req->mkdir_next == NULL) req->mkdir_next = strdup(req->path);
+
+    path_dirname(req->mkdir_next, &dirname, path_behavior_system);
+
+    if (dirname == strlen(req->path)) break;
+
+    req->mkdir_next[dirname - 1] = '\0';
+
+    uv_fs_req_cleanup(handle);
+
+    err = uv_fs_mkdir(handle->loop, handle, req->mkdir_next, 0777, rocksdb__on_mkdir);
+    assert(err == 0);
+
+    return;
+  }
+  }
+
+  uv_fs_req_cleanup(handle);
+
+  if (req->mkdir_next) free(req->mkdir_next);
+
+  err = uv_queue_work(handle->loop, &req->worker, rocksdb__on_open, rocksdb__on_status<rocksdb_open_t>);
+  assert(err == 0);
+}
+
 extern "C" int
 rocksdb_open (rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, rocksdb_open_cb cb) {
   req->db = db;
@@ -171,6 +230,17 @@ rocksdb_open (rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksd
   strcpy(req->path, path);
 
   req->worker.data = static_cast<void *>(req);
+
+  auto create_if_missing = rocksdb__option<&rocksdb_options_t::create_if_missing, bool>(
+    &req->options, 0
+  );
+
+  if (create_if_missing) {
+    req->mkdir.data = static_cast<void *>(req);
+    req->mkdir_next = NULL;
+
+    return uv_fs_mkdir(db->loop, &req->mkdir, req->path, 0777, rocksdb__on_mkdir);
+  }
 
   return uv_queue_work(db->loop, &req->worker, rocksdb__on_open, rocksdb__on_status<rocksdb_open_t>);
 }
