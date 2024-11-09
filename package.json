@@ -1,0 +1,17 @@
+{
+  "private": true,
+  "name": "librocksdb",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/holepunchto/librocksdb.git"
+  },
+  "author": "Holepunch",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/holepunchto/librocksdb/issues"
+  },
+  "homepage": "https://github.com/holepunchto/librocksdb#readme",
+  "devDependencies": {
+    "cmake-fetch": "^1.0.0"
+  }
+}

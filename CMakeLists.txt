@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 
+find_package(cmake-fetch REQUIRED PATHS node_modules/cmake-fetch)
+
 project(rocksdb C CXX)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -16,15 +18,9 @@ set(ROCKSDB_SKIP_THIRDPARTY ON CACHE BOOL "Skip third-party RocksDB integrations
 
 set(ARTIFACT_SUFFIX _facebook) # Ensure that upstream RocksDB targets don't clash
 
-add_subdirectory(vendor/rocksdb EXCLUDE_FROM_ALL)
-
-if(NOT TARGET uv)
-  add_subdirectory(vendor/libuv EXCLUDE_FROM_ALL)
-endif()
-
-if(NOT TARGET path)
-  add_subdirectory(vendor/libpath EXCLUDE_FROM_ALL)
-endif()
+fetch_package("github:libuv/libuv@1.48.0")
+fetch_package("github:holepunchto/rocksdb")
+fetch_package("github:holepunchto/libpath")
 
 add_library(rocksdb OBJECT)
 
