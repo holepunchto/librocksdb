@@ -175,6 +175,7 @@ rocksdb__on_mkdir (uv_fs_t *handle) {
   case UV_EPERM:
     break;
 
+  case UV_EEXIST:
   case 0: {
     if (req->mkdir_next == NULL) break;
 
