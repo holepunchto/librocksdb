@@ -75,7 +75,6 @@ extern "C" int
 rocksdb_init (uv_loop_t *loop, rocksdb_t *db) {
   db->loop = loop;
   db->handle = nullptr;
-  db->open = NULL;
   db->close = NULL;
   db->reqs = NULL;
 

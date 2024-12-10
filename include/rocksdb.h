@@ -248,7 +248,6 @@ struct rocksdb_s {
 
   intrusive_ring_t *reqs;
 
-  rocksdb_open_t *open;
   rocksdb_close_t *close;
 };
 
