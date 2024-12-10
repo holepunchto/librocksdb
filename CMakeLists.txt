@@ -21,6 +21,7 @@ set(ARTIFACT_SUFFIX _facebook) # Ensure that upstream RocksDB targets don't clas
 fetch_package("github:libuv/libuv@1.48.0")
 fetch_package("github:holepunchto/rocksdb#4051ad4")
 fetch_package("github:holepunchto/libpath")
+fetch_package("github:holepunchto/libintrusive")
 
 add_library(rocksdb OBJECT)
 
@@ -42,12 +43,19 @@ target_sources(
 
 target_include_directories(
   rocksdb
-  PUBLIC
+  INTERFACE
     include
+  PUBLIC
     $<TARGET_PROPERTY:uv,INTERFACE_INCLUDE_DIRECTORIES>
+)
+
+target_link_libraries(
+  rocksdb
   PRIVATE
-    $<TARGET_PROPERTY:rocksdb_facebook,INTERFACE_INCLUDE_DIRECTORIES>
-    $<TARGET_PROPERTY:path,INTERFACE_INCLUDE_DIRECTORIES>
+    rocksdb_facebook
+  PUBLIC
+    path
+    intrusive
 )
 
 add_library(rocksdb_shared SHARED)
