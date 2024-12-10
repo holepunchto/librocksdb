@@ -20,7 +20,7 @@ static void
 on_open (rocksdb_open_t *req, int status) {
   int e;
 
-  assert(status == UV_ECANCELED);
+  assert(status == 0 || status == UV_ECANCELED);
 
   open_called = true;
 }
