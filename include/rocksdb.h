@@ -11,8 +11,11 @@ extern "C" {
 #include <uv.h>
 
 typedef struct rocksdb_options_s rocksdb_options_t;
+typedef struct rocksdb_column_family_options_s rocksdb_column_family_options_t;
 typedef struct rocksdb_read_options_s rocksdb_read_options_t;
 typedef struct rocksdb_write_options_s rocksdb_write_options_t;
+typedef struct rocksdb_column_family_s rocksdb_column_family_t;
+typedef struct rocksdb_column_family_descriptor_s rocksdb_column_family_descriptor_t;
 typedef struct rocksdb_req_s rocksdb_req_t;
 typedef struct rocksdb_open_s rocksdb_open_t;
 typedef struct rocksdb_close_s rocksdb_close_t;
@@ -50,10 +53,18 @@ struct rocksdb_options_s {
   bool create_if_missing;
 
   /** @since 0 */
+  bool create_missing_column_families;
+
+  /** @since 0 */
   int max_background_jobs;
 
   /** @since 0 */
   uint64_t bytes_per_sync;
+};
+
+/** @version 0 */
+struct rocksdb_column_family_options_s {
+  int version;
 
   /** @since 0 */
   rocksdb_compaction_style_t compaction_style;
@@ -93,6 +104,14 @@ struct rocksdb_write_options_s {
   int version;
 };
 
+struct rocksdb_column_family_s; // Opaque
+
+struct rocksdb_column_family_descriptor_s {
+  const char *name;
+
+  rocksdb_column_family_options_t options;
+};
+
 struct rocksdb_req_s {
   uv_work_t worker;
 
@@ -109,6 +128,11 @@ struct rocksdb_open_s {
   rocksdb_options_t options;
 
   char path[4096 + 1 /* NULL */];
+
+  const rocksdb_column_family_descriptor_t *column_families;
+  rocksdb_column_family_t **handles;
+
+  size_t len;
 
   char *error;
 
@@ -145,6 +169,8 @@ struct rocksdb_iterator_s {
 
   rocksdb_read_options_t options;
 
+  rocksdb_column_family_t *column_family;
+
   void *handle; // Opaque iterator pointer
 
   rocksdb_range_t range;
@@ -169,6 +195,8 @@ typedef enum {
 
 struct rocksdb_read_s {
   rocksdb_read_type_t type;
+
+  rocksdb_column_family_t *column_family;
 
   union {
     // For get
@@ -203,6 +231,8 @@ typedef enum {
 
 struct rocksdb_write_s {
   rocksdb_write_type_t type;
+
+  rocksdb_column_family_t *column_family;
 
   union {
     // For put, delete
@@ -255,10 +285,19 @@ int
 rocksdb_init (uv_loop_t *loop, rocksdb_t *db);
 
 int
-rocksdb_open (rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, rocksdb_open_cb cb);
+rocksdb_open (rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_open_cb cb);
 
 int
 rocksdb_close (rocksdb_t *db, rocksdb_close_t *req, rocksdb_close_cb cb);
+
+rocksdb_column_family_descriptor_t
+rocksdb_column_family_descriptor (const char *name, const rocksdb_column_family_options_t *options);
+
+rocksdb_column_family_t *
+rocksdb_column_family_default (rocksdb_t *db);
+
+int
+rocksdb_column_family_destroy (rocksdb_t *db, rocksdb_column_family_t *column_family);
 
 rocksdb_slice_t
 rocksdb_slice_init (const char *data, size_t len);
@@ -270,7 +309,7 @@ rocksdb_slice_t
 rocksdb_slice_empty (void);
 
 int
-rocksdb_iterator_open (rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb);
+rocksdb_iterator_open (rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb);
 
 int
 rocksdb_iterator_close (rocksdb_iterator_t *req, rocksdb_iterator_cb cb);
