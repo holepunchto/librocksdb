@@ -19,6 +19,8 @@ typedef struct rocksdb_column_family_descriptor_s rocksdb_column_family_descript
 typedef struct rocksdb_req_s rocksdb_req_t;
 typedef struct rocksdb_open_s rocksdb_open_t;
 typedef struct rocksdb_close_s rocksdb_close_t;
+typedef struct rocksdb_suspend_s rocksdb_suspend_t;
+typedef struct rocksdb_resume_s rocksdb_resume_t;
 typedef struct rocksdb_slice_s rocksdb_slice_t;
 typedef struct rocksdb_range_s rocksdb_range_t;
 typedef struct rocksdb_iterator_s rocksdb_iterator_t;
@@ -31,6 +33,8 @@ typedef struct rocksdb_s rocksdb_t;
 
 typedef void (*rocksdb_open_cb)(rocksdb_open_t *req, int status);
 typedef void (*rocksdb_close_cb)(rocksdb_close_t *req, int status);
+typedef void (*rocksdb_suspend_cb)(rocksdb_suspend_t *req, int status);
+typedef void (*rocksdb_resume_cb)(rocksdb_resume_t *req, int status);
 typedef void (*rocksdb_iterator_cb)(rocksdb_iterator_t *iterator, int status);
 typedef void (*rocksdb_read_batch_cb)(rocksdb_read_batch_t *batch, int status);
 typedef void (*rocksdb_write_batch_cb)(rocksdb_write_batch_t *batch, int status);
@@ -147,6 +151,26 @@ struct rocksdb_close_s {
   char *error;
 
   rocksdb_close_cb cb;
+
+  void *data;
+};
+
+struct rocksdb_suspend_s {
+  rocksdb_req_t req;
+
+  char *error;
+
+  rocksdb_suspend_cb cb;
+
+  void *data;
+};
+
+struct rocksdb_resume_s {
+  rocksdb_req_t req;
+
+  char *error;
+
+  rocksdb_resume_cb cb;
 
   void *data;
 };
@@ -289,6 +313,12 @@ rocksdb_open (rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksd
 
 int
 rocksdb_close (rocksdb_t *db, rocksdb_close_t *req, rocksdb_close_cb cb);
+
+int
+rocksdb_suspend (rocksdb_t *db, rocksdb_suspend_t *req, rocksdb_suspend_cb cb);
+
+int
+rocksdb_resume (rocksdb_t *db, rocksdb_resume_t *req, rocksdb_resume_cb cb);
 
 rocksdb_column_family_descriptor_t
 rocksdb_column_family_descriptor (const char *name, const rocksdb_column_family_options_t *options);
