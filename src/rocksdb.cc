@@ -413,7 +413,7 @@ static void
 rocksdb__on_suspend (uv_work_t *handle) {
   int err;
 
-  auto req = reinterpret_cast<rocksdb_open_t *>(handle->data);
+  auto req = reinterpret_cast<rocksdb_suspend_t *>(handle->data);
 
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
@@ -437,7 +437,7 @@ rocksdb_suspend (rocksdb_t *db, rocksdb_suspend_t *req, rocksdb_suspend_cb cb) {
 
   rocksdb__add_req(req);
 
-  return uv_queue_work(db->loop, &req->req.worker, rocksdb__on_open, rocksdb__on_after_open);
+  return uv_queue_work(db->loop, &req->req.worker, rocksdb__on_suspend, rocksdb__on_after_suspend);
 }
 
 namespace {
@@ -459,7 +459,7 @@ static void
 rocksdb__on_resume (uv_work_t *handle) {
   int err;
 
-  auto req = reinterpret_cast<rocksdb_open_t *>(handle->data);
+  auto req = reinterpret_cast<rocksdb_resume_t *>(handle->data);
 
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
@@ -483,7 +483,7 @@ rocksdb_resume (rocksdb_t *db, rocksdb_resume_t *req, rocksdb_resume_cb cb) {
 
   rocksdb__add_req(req);
 
-  return uv_queue_work(db->loop, &req->req.worker, rocksdb__on_open, rocksdb__on_after_open);
+  return uv_queue_work(db->loop, &req->req.worker, rocksdb__on_resume, rocksdb__on_after_resume);
 }
 
 extern "C" rocksdb_column_family_descriptor_t
