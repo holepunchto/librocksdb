@@ -435,6 +435,8 @@ rocksdb_suspend (rocksdb_t *db, rocksdb_suspend_t *req, rocksdb_suspend_cb cb) {
   req->error = nullptr;
   req->cb = cb;
 
+  req->req.worker.data = static_cast<void *>(req);
+
   rocksdb__add_req(req);
 
   return uv_queue_work(db->loop, &req->req.worker, rocksdb__on_suspend, rocksdb__on_after_suspend);
@@ -480,6 +482,8 @@ rocksdb_resume (rocksdb_t *db, rocksdb_resume_t *req, rocksdb_resume_cb cb) {
   req->req.cancelable = true;
   req->error = nullptr;
   req->cb = cb;
+
+  req->req.worker.data = static_cast<void *>(req);
 
   rocksdb__add_req(req);
 
