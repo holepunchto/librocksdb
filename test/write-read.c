@@ -8,10 +8,13 @@
 static uv_loop_t *loop;
 
 static rocksdb_t db;
+static rocksdb_column_family_t *family;
 
 static void
 on_close (rocksdb_close_t *req, int status) {
   assert(status == 0);
+
+  assert(req->error == NULL);
 }
 
 static void
@@ -26,6 +29,9 @@ on_read (rocksdb_read_batch_t *req, int status) {
 
   assert(strcmp(read.value.data, "world") == 0);
 
+  e = rocksdb_column_family_destroy(&db, family);
+  assert(e == 0);
+
   static rocksdb_close_t close;
   e = rocksdb_close(&db, &close, on_close);
   assert(e == 0);
@@ -39,6 +45,7 @@ on_write (rocksdb_write_batch_t *req, int status) {
 
   static rocksdb_read_t read;
   read.type = rocksdb_get;
+  read.column_family = family;
   read.key = rocksdb_slice_init("hello", 5);
   read.value = rocksdb_slice_empty();
 
@@ -55,8 +62,11 @@ on_open (rocksdb_open_t *req, int status) {
 
   assert(status == 0);
 
+  assert(req->error == NULL);
+
   static rocksdb_write_t write;
   write.type = rocksdb_put;
+  write.column_family = family;
   write.key = rocksdb_slice_init("hello", 5);
   write.value = rocksdb_slice_init("world", 6);
 
@@ -78,8 +88,10 @@ main () {
     .create_if_missing = true,
   };
 
+  rocksdb_column_family_descriptor_t descriptor = rocksdb_column_family_descriptor("default", NULL);
+
   static rocksdb_open_t open;
-  e = rocksdb_open(&db, &open, "test/fixtures/write-read.db", &options, on_open);
+  e = rocksdb_open(&db, &open, "test/fixtures/write-read.db", &options, &descriptor, &family, 1, on_open);
   assert(e == 0);
 
   e = uv_run(loop, UV_RUN_DEFAULT);

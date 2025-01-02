@@ -8,10 +8,13 @@
 static uv_loop_t *loop;
 
 static rocksdb_t db;
+static rocksdb_column_family_t *family;
 
 static void
 on_close (rocksdb_close_t *req, int status) {
   assert(status == 0);
+
+  assert(req->error == NULL);
 }
 
 static void
@@ -38,6 +41,9 @@ on_read (rocksdb_read_batch_t *req, int status) {
   V(4, "e")
 #undef V
 
+  e = rocksdb_column_family_destroy(&db, family);
+  assert(e == 0);
+
   static rocksdb_close_t close;
   e = rocksdb_close(&db, &close, on_close);
   assert(e == 0);
@@ -49,10 +55,13 @@ on_delete (rocksdb_write_batch_t *req, int status) {
 
   assert(status == 0);
 
+  assert(req->error == NULL);
+
   static rocksdb_read_t reads[5];
 
 #define V(i, k) \
   reads[i].type = rocksdb_get; \
+  reads[i].column_family = family; \
   reads[i].key = rocksdb_slice_init(k, 2);
 
   V(0, "a")
@@ -75,8 +84,11 @@ on_write (rocksdb_write_batch_t *req, int status) {
 
   assert(status == 0);
 
+  assert(req->error == NULL);
+
   static rocksdb_write_t write;
   write.type = rocksdb_delete_range;
+  write.column_family = family;
   write.start = rocksdb_slice_init("b", 2);
   write.end = rocksdb_slice_init("e", 2);
 
@@ -91,10 +103,13 @@ on_open (rocksdb_open_t *req, int status) {
 
   assert(status == 0);
 
+  assert(req->error == NULL);
+
   static rocksdb_write_t writes[5];
 
 #define V(i, k) \
   writes[i].type = rocksdb_put; \
+  writes[i].column_family = family; \
   writes[i].key = rocksdb_slice_init(k, 2); \
   writes[i].value = rocksdb_slice_init(k, 2);
 
@@ -123,8 +138,10 @@ main () {
     .create_if_missing = true,
   };
 
+  rocksdb_column_family_descriptor_t descriptor = rocksdb_column_family_descriptor("default", NULL);
+
   static rocksdb_open_t open;
-  e = rocksdb_open(&db, &open, "test/fixtures/delete-range.db", &options, on_open);
+  e = rocksdb_open(&db, &open, "test/fixtures/delete-range.db", &options, &descriptor, &family, 1, on_open);
   assert(e == 0);
 
   e = uv_run(loop, UV_RUN_DEFAULT);

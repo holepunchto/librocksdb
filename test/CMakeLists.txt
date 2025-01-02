@@ -4,6 +4,7 @@ list(APPEND tests
   delete-range-and-end
   iterate-prefix
   open-close
+  open-close-immediately
   write-read
   write-read-snapshot
 )

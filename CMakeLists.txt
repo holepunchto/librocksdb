@@ -19,8 +19,17 @@ set(ROCKSDB_SKIP_THIRDPARTY ON CACHE BOOL "Skip third-party RocksDB integrations
 set(ARTIFACT_SUFFIX _facebook) # Ensure that upstream RocksDB targets don't clash
 
 fetch_package("github:libuv/libuv@1.48.0")
-fetch_package("github:facebook/rocksdb#6f9d826")
+fetch_package("github:facebook/rocksdb@9.9.3")
 fetch_package("github:holepunchto/libpath")
+fetch_package("github:holepunchto/libintrusive")
+
+# Neuter the C bindings from RocksDB to ensure they don't collide with ours
+set_source_files_properties(
+  ${rocksdb_dir}/db/c.cc
+  TARGET_DIRECTORY rocksdb_facebook
+  PROPERTIES
+  HEADER_FILE_ONLY ON
+)
 
 add_library(rocksdb OBJECT)
 
@@ -42,12 +51,19 @@ target_sources(
 
 target_include_directories(
   rocksdb
-  PUBLIC
+  INTERFACE
     include
+  PUBLIC
     $<TARGET_PROPERTY:uv,INTERFACE_INCLUDE_DIRECTORIES>
+)
+
+target_link_libraries(
+  rocksdb
   PRIVATE
-    $<TARGET_PROPERTY:rocksdb_facebook,INTERFACE_INCLUDE_DIRECTORIES>
-    $<TARGET_PROPERTY:path,INTERFACE_INCLUDE_DIRECTORIES>
+    rocksdb_facebook
+  PUBLIC
+    path
+    intrusive
 )
 
 add_library(rocksdb_shared SHARED)
