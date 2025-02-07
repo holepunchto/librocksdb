@@ -556,7 +556,7 @@ rocksdb__slice_cast (const Slice &slice) {
 
 static inline rocksdb_slice_t
 rocksdb__slice_missing () {
-  return {.data = nullptr, .len = static_cast<size>(-1)};
+  return {.data = nullptr, .len = static_cast<size_t>(-1)};
 }
 
 } // namespace
