@@ -31,7 +31,7 @@ on_read (rocksdb_read_batch_t *req, int status) {
 \
     rocksdb_slice_destroy(&req->reads[i].value); \
   } else { \
-    assert(req->reads[i].value.len == 0); \
+    assert(req->reads[i].value.data == NULL); \
   }
 
   V(0, "a")
