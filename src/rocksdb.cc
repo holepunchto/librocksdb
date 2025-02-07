@@ -554,6 +554,11 @@ rocksdb__slice_cast (const Slice &slice) {
   return reinterpret_cast<const rocksdb_slice_t &>(slice);
 }
 
+static inline rocksdb_slice_t
+rocksdb__slice_missing () {
+  return {.data = nullptr, .len = static_cast<size>(-1)};
+}
+
 } // namespace
 
 namespace {
@@ -937,6 +942,8 @@ rocksdb__on_read (uv_work_t *handle) {
 
         req->errors[i] = nullptr;
       } else if (status.code() == Status::kNotFound) {
+        value = rocksdb__slice_missing();
+
         req->errors[i] = nullptr;
       } else {
         req->errors[i] = strdup(status.getState());
