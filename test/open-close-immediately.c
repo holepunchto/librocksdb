@@ -11,7 +11,7 @@ static bool open_called = false;
 static bool close_called = false;
 
 static void
-on_close (rocksdb_close_t *req, int status) {
+on_close(rocksdb_close_t *req, int status) {
   assert(status == 0);
 
   assert(req->error == NULL);
@@ -20,7 +20,7 @@ on_close (rocksdb_close_t *req, int status) {
 }
 
 static void
-on_open (rocksdb_open_t *req, int status) {
+on_open(rocksdb_open_t *req, int status) {
   int e;
 
   assert(status == 0 || status == UV_ECANCELED);
@@ -36,7 +36,7 @@ on_open (rocksdb_open_t *req, int status) {
 }
 
 int
-main () {
+main() {
   int e;
 
   uv_loop_t *loop = uv_default_loop();

@@ -58,32 +58,32 @@ namespace {
 
 template <auto rocksdb_options_t::*P, typename T>
 static inline T
-rocksdb__option (const rocksdb_options_t *options, int min_version, T fallback = T(rocksdb__default_options.*P)) {
+rocksdb__option(const rocksdb_options_t *options, int min_version, T fallback = T(rocksdb__default_options.*P)) {
   return options->version >= min_version ? T(options->*P) : fallback;
 }
 
 template <auto rocksdb_column_family_options_t::*P, typename T>
 static inline T
-rocksdb__option (const rocksdb_column_family_options_t *options, int min_version, T fallback = T(rocksdb__default_column_family_options.*P)) {
+rocksdb__option(const rocksdb_column_family_options_t *options, int min_version, T fallback = T(rocksdb__default_column_family_options.*P)) {
   return options->version >= min_version ? T(options->*P) : fallback;
 }
 
 template <auto rocksdb_read_options_t::*P, typename T>
 static inline T
-rocksdb__option (const rocksdb_read_options_t *options, int min_version, T fallback = T(rocksdb__default_read_options.*P)) {
+rocksdb__option(const rocksdb_read_options_t *options, int min_version, T fallback = T(rocksdb__default_read_options.*P)) {
   return options->version >= min_version ? T(options->*P) : fallback;
 }
 
 template <auto rocksdb_write_options_t::*P, typename T>
 static inline T
-rocksdb__option (const rocksdb_write_options_t *options, int min_version, T fallback = T(rocksdb__default_write_options.*P)) {
+rocksdb__option(const rocksdb_write_options_t *options, int min_version, T fallback = T(rocksdb__default_write_options.*P)) {
   return options->version >= min_version ? T(options->*P) : fallback;
 }
 
 } // namespace
 
 extern "C" int
-rocksdb_init (uv_loop_t *loop, rocksdb_t *db) {
+rocksdb_init(uv_loop_t *loop, rocksdb_t *db) {
   db->loop = loop;
   db->handle = nullptr;
   db->close = NULL;
@@ -95,14 +95,14 @@ rocksdb_init (uv_loop_t *loop, rocksdb_t *db) {
 namespace {
 
 static inline int
-rocksdb__close_maybe (rocksdb_t *db);
+rocksdb__close_maybe(rocksdb_t *db);
 
 } // namespace
 
 namespace {
 
 static inline void
-rocksdb__add_req (rocksdb_t *db, rocksdb_req_t *req) {
+rocksdb__add_req(rocksdb_t *db, rocksdb_req_t *req) {
   auto ring = &req->reqs;
 
   intrusive_ring_init(ring);
@@ -116,12 +116,12 @@ rocksdb__add_req (rocksdb_t *db, rocksdb_req_t *req) {
 
 template <typename T>
 static inline void
-rocksdb__add_req (T *req) {
+rocksdb__add_req(T *req) {
   rocksdb__add_req(req->req.db, &req->req);
 }
 
 static inline void
-rocksdb__remove_req (rocksdb_t *db, rocksdb_req_t *req) {
+rocksdb__remove_req(rocksdb_t *db, rocksdb_req_t *req) {
   auto ring = &req->reqs;
 
   db->reqs = intrusive_ring_remove(ring);
@@ -131,7 +131,7 @@ rocksdb__remove_req (rocksdb_t *db, rocksdb_req_t *req) {
 
 template <typename T>
 static inline void
-rocksdb__remove_req (T *req) {
+rocksdb__remove_req(T *req) {
   rocksdb__remove_req(req->req.db, &req->req);
 }
 
@@ -140,7 +140,7 @@ rocksdb__remove_req (T *req) {
 namespace {
 
 static inline void
-rocksdb__on_after_open (uv_work_t *handle, int status) {
+rocksdb__on_after_open(uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_open_t *>(handle->data);
 
   rocksdb__remove_req(req);
@@ -153,7 +153,7 @@ rocksdb__on_after_open (uv_work_t *handle, int status) {
 }
 
 static void
-rocksdb__on_open (uv_work_t *handle) {
+rocksdb__on_open(uv_work_t *handle) {
   int err;
 
   auto req = reinterpret_cast<rocksdb_open_t *>(handle->data);
@@ -300,7 +300,7 @@ rocksdb__on_open (uv_work_t *handle) {
 } // namespace
 
 extern "C" int
-rocksdb_open (rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_open_cb cb) {
+rocksdb_open(rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_open_cb cb) {
   req->req.db = db;
   req->req.cancelable = true;
   req->options = options ? *options : rocksdb__default_options;
@@ -322,7 +322,7 @@ rocksdb_open (rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksd
 namespace {
 
 static inline void
-rocksdb__on_after_close (uv_work_t *handle, int status) {
+rocksdb__on_after_close(uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_close_t *>(handle->data);
 
   auto error = req->error;
@@ -333,7 +333,7 @@ rocksdb__on_after_close (uv_work_t *handle, int status) {
 }
 
 static void
-rocksdb__on_close (uv_work_t *handle) {
+rocksdb__on_close(uv_work_t *handle) {
   auto req = reinterpret_cast<rocksdb_close_t *>(handle->data);
 
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
@@ -354,7 +354,7 @@ rocksdb__on_close (uv_work_t *handle) {
 } // namespace
 
 extern "C" int
-rocksdb_close (rocksdb_t *db, rocksdb_close_t *req, rocksdb_close_cb cb) {
+rocksdb_close(rocksdb_t *db, rocksdb_close_t *req, rocksdb_close_cb cb) {
   req->req.db = db;
   req->req.cancelable = false;
   req->error = nullptr;
@@ -378,7 +378,7 @@ rocksdb_close (rocksdb_t *db, rocksdb_close_t *req, rocksdb_close_cb cb) {
 namespace {
 
 static inline int
-rocksdb__close_maybe (rocksdb_t *db) {
+rocksdb__close_maybe(rocksdb_t *db) {
   rocksdb_close_t *req = db->close;
 
   if (db->reqs || req == NULL) return 0;
@@ -397,7 +397,7 @@ rocksdb__close_maybe (rocksdb_t *db) {
 namespace {
 
 static inline void
-rocksdb__on_after_suspend (uv_work_t *handle, int status) {
+rocksdb__on_after_suspend(uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_suspend_t *>(handle->data);
 
   rocksdb__remove_req(req);
@@ -410,7 +410,7 @@ rocksdb__on_after_suspend (uv_work_t *handle, int status) {
 }
 
 static void
-rocksdb__on_suspend (uv_work_t *handle) {
+rocksdb__on_suspend(uv_work_t *handle) {
   int err;
 
   auto req = reinterpret_cast<rocksdb_suspend_t *>(handle->data);
@@ -429,7 +429,7 @@ rocksdb__on_suspend (uv_work_t *handle) {
 } // namespace
 
 extern "C" int
-rocksdb_suspend (rocksdb_t *db, rocksdb_suspend_t *req, rocksdb_suspend_cb cb) {
+rocksdb_suspend(rocksdb_t *db, rocksdb_suspend_t *req, rocksdb_suspend_cb cb) {
   req->req.db = db;
   req->req.cancelable = true;
   req->error = nullptr;
@@ -445,7 +445,7 @@ rocksdb_suspend (rocksdb_t *db, rocksdb_suspend_t *req, rocksdb_suspend_cb cb) {
 namespace {
 
 static inline void
-rocksdb__on_after_resume (uv_work_t *handle, int status) {
+rocksdb__on_after_resume(uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_resume_t *>(handle->data);
 
   rocksdb__remove_req(req);
@@ -458,7 +458,7 @@ rocksdb__on_after_resume (uv_work_t *handle, int status) {
 }
 
 static void
-rocksdb__on_resume (uv_work_t *handle) {
+rocksdb__on_resume(uv_work_t *handle) {
   int err;
 
   auto req = reinterpret_cast<rocksdb_resume_t *>(handle->data);
@@ -477,7 +477,7 @@ rocksdb__on_resume (uv_work_t *handle) {
 } // namespace
 
 extern "C" int
-rocksdb_resume (rocksdb_t *db, rocksdb_resume_t *req, rocksdb_resume_cb cb) {
+rocksdb_resume(rocksdb_t *db, rocksdb_resume_t *req, rocksdb_resume_cb cb) {
   req->req.db = db;
   req->req.cancelable = true;
   req->error = nullptr;
@@ -491,7 +491,7 @@ rocksdb_resume (rocksdb_t *db, rocksdb_resume_t *req, rocksdb_resume_cb cb) {
 }
 
 extern "C" rocksdb_column_family_descriptor_t
-rocksdb_column_family_descriptor (const char *name, const rocksdb_column_family_options_t *options) {
+rocksdb_column_family_descriptor(const char *name, const rocksdb_column_family_options_t *options) {
   rocksdb_column_family_descriptor_t descriptor;
 
   descriptor.name = name;
@@ -501,14 +501,14 @@ rocksdb_column_family_descriptor (const char *name, const rocksdb_column_family_
 }
 
 extern "C" rocksdb_column_family_t *
-rocksdb_column_family_default (rocksdb_t *db) {
+rocksdb_column_family_default(rocksdb_t *db) {
   auto handle = reinterpret_cast<DB *>(db->handle)->DefaultColumnFamily();
 
   return reinterpret_cast<rocksdb_column_family_t *>(handle);
 }
 
 extern "C" int
-rocksdb_column_family_destroy (rocksdb_t *db, rocksdb_column_family_t *column_family) {
+rocksdb_column_family_destroy(rocksdb_t *db, rocksdb_column_family_t *column_family) {
   auto handle = reinterpret_cast<ColumnFamilyHandle *>(column_family);
 
   auto status = reinterpret_cast<DB *>(db->handle)->DestroyColumnFamilyHandle(handle);
@@ -517,24 +517,24 @@ rocksdb_column_family_destroy (rocksdb_t *db, rocksdb_column_family_t *column_fa
 }
 
 extern "C" rocksdb_slice_t
-rocksdb_slice_init (const char *data, size_t len) {
+rocksdb_slice_init(const char *data, size_t len) {
   return {.data = data, .len = len};
 }
 
 extern "C" void
-rocksdb_slice_destroy (rocksdb_slice_t *slice) {
+rocksdb_slice_destroy(rocksdb_slice_t *slice) {
   free(const_cast<char *>(slice->data));
 }
 
 extern "C" rocksdb_slice_t
-rocksdb_slice_empty (void) {
+rocksdb_slice_empty(void) {
   return {.data = nullptr, .len = 0};
 }
 
 namespace {
 
 static inline rocksdb_slice_t
-rocksdb__slice_copy (const Slice &slice) {
+rocksdb__slice_copy(const Slice &slice) {
   auto len = slice.size();
 
   auto data = reinterpret_cast<char *>(malloc(len));
@@ -545,17 +545,17 @@ rocksdb__slice_copy (const Slice &slice) {
 }
 
 static inline const Slice &
-rocksdb__slice_cast (const rocksdb_slice_t &slice) {
+rocksdb__slice_cast(const rocksdb_slice_t &slice) {
   return reinterpret_cast<const Slice &>(slice);
 }
 
 static inline const rocksdb_slice_t &
-rocksdb__slice_cast (const Slice &slice) {
+rocksdb__slice_cast(const Slice &slice) {
   return reinterpret_cast<const rocksdb_slice_t &>(slice);
 }
 
 static inline rocksdb_slice_t
-rocksdb__slice_missing () {
+rocksdb__slice_missing() {
   return {.data = nullptr, .len = static_cast<size_t>(-1)};
 }
 
@@ -564,7 +564,7 @@ rocksdb__slice_missing () {
 namespace {
 
 static inline void
-rocksdb__iterator_seek_first (Iterator *iterator, const rocksdb_range_t &range) {
+rocksdb__iterator_seek_first(Iterator *iterator, const rocksdb_range_t &range) {
   if (range.gte.len) {
     auto gte = rocksdb__slice_cast(range.gte);
 
@@ -583,7 +583,7 @@ rocksdb__iterator_seek_first (Iterator *iterator, const rocksdb_range_t &range) 
 }
 
 static inline void
-rocksdb__iterator_seek_last (Iterator *iterator, const rocksdb_range_t &range) {
+rocksdb__iterator_seek_last(Iterator *iterator, const rocksdb_range_t &range) {
   if (range.lte.len) {
     auto lte = rocksdb__slice_cast(range.lte);
 
@@ -612,7 +612,7 @@ rocksdb__iterator_seek_last (Iterator *iterator, const rocksdb_range_t &range) {
 
 template <bool reverse>
 static inline void
-rocksdb__iterator_seek (Iterator *iterator, const rocksdb_range_t &range) {
+rocksdb__iterator_seek(Iterator *iterator, const rocksdb_range_t &range) {
   if (reverse) {
     rocksdb__iterator_seek_last(iterator, range);
   } else {
@@ -622,7 +622,7 @@ rocksdb__iterator_seek (Iterator *iterator, const rocksdb_range_t &range) {
 
 template <typename T>
 static inline void
-rocksdb__iterator_seek (Iterator *iterator, T *req) {
+rocksdb__iterator_seek(Iterator *iterator, T *req) {
   const auto &range = req->range;
 
   if (req->reverse) {
@@ -634,7 +634,7 @@ rocksdb__iterator_seek (Iterator *iterator, T *req) {
 
 template <bool reverse = false>
 static inline void
-rocksdb__iterator_next (Iterator *iterator) {
+rocksdb__iterator_next(Iterator *iterator) {
   if (reverse) {
     iterator->Prev();
   } else {
@@ -644,7 +644,7 @@ rocksdb__iterator_next (Iterator *iterator) {
 
 template <typename T>
 static inline void
-rocksdb__iterator_next (Iterator *iterator, T *req) {
+rocksdb__iterator_next(Iterator *iterator, T *req) {
   if (req->reverse) {
     rocksdb__iterator_next<true>(iterator);
   } else {
@@ -653,7 +653,7 @@ rocksdb__iterator_next (Iterator *iterator, T *req) {
 }
 
 static inline bool
-rocksdb__iterator_valid (Iterator *iterator, const rocksdb_range_t &range) {
+rocksdb__iterator_valid(Iterator *iterator, const rocksdb_range_t &range) {
   if (!iterator->Valid()) return false;
 
   auto key = iterator->key();
@@ -668,13 +668,13 @@ rocksdb__iterator_valid (Iterator *iterator, const rocksdb_range_t &range) {
 
 template <typename T>
 static inline bool
-rocksdb__iterator_valid (Iterator *iterator, T *req) {
+rocksdb__iterator_valid(Iterator *iterator, T *req) {
   return rocksdb__iterator_valid(iterator, req->range);
 }
 
 template <bool reverse = false>
 static inline Iterator *
-rocksdb__iterator_open (DB *db, const ReadOptions &options, ColumnFamilyHandle *column_family, const rocksdb_range_t &range) {
+rocksdb__iterator_open(DB *db, const ReadOptions &options, ColumnFamilyHandle *column_family, const rocksdb_range_t &range) {
   auto iterator = db->NewIterator(options, column_family);
 
   rocksdb__iterator_seek<reverse>(iterator, range);
@@ -684,7 +684,7 @@ rocksdb__iterator_open (DB *db, const ReadOptions &options, ColumnFamilyHandle *
 
 template <typename T>
 static inline Iterator *
-rocksdb__iterator_open (T *req) {
+rocksdb__iterator_open(T *req) {
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
   const auto &range = req->range;
@@ -708,7 +708,7 @@ rocksdb__iterator_open (T *req) {
 
 template <typename T>
 static inline void
-rocksdb__iterator_read (Iterator *iterator, T *req) {
+rocksdb__iterator_read(Iterator *iterator, T *req) {
   while (rocksdb__iterator_valid(iterator, req) && req->len < req->capacity) {
     auto i = req->len++;
 
@@ -721,7 +721,7 @@ rocksdb__iterator_read (Iterator *iterator, T *req) {
 
 template <typename T>
 static inline void
-rocksdb__iterator_refresh (Iterator *iterator, T *req) {
+rocksdb__iterator_refresh(Iterator *iterator, T *req) {
   auto snapshot = rocksdb__option<&rocksdb_read_options_t::snapshot, rocksdb_snapshot_t *>(
     &req->options, 0
   );
@@ -740,7 +740,7 @@ rocksdb__iterator_refresh (Iterator *iterator, T *req) {
 namespace {
 
 static void
-rocksdb__on_after_iterator (uv_work_t *handle, int status) {
+rocksdb__on_after_iterator(uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
 
   rocksdb__remove_req(req);
@@ -753,7 +753,7 @@ rocksdb__on_after_iterator (uv_work_t *handle, int status) {
 }
 
 static void
-rocksdb__on_iterator_open (uv_work_t *handle) {
+rocksdb__on_iterator_open(uv_work_t *handle) {
   auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
 
   auto iterator = rocksdb__iterator_open(req);
@@ -772,7 +772,7 @@ rocksdb__on_iterator_open (uv_work_t *handle) {
 } // namespace
 
 extern "C" int
-rocksdb_iterator_open (rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb) {
+rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb) {
   req->req.db = db;
   req->req.cancelable = true;
   req->options = options ? *options : rocksdb__default_read_options;
@@ -791,7 +791,7 @@ rocksdb_iterator_open (rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_fa
 namespace {
 
 static void
-rocksdb__on_iterator_close (uv_work_t *handle) {
+rocksdb__on_iterator_close(uv_work_t *handle) {
   auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
 
   auto iterator = reinterpret_cast<Iterator *>(req->handle);
@@ -802,7 +802,7 @@ rocksdb__on_iterator_close (uv_work_t *handle) {
 } // namespace
 
 extern "C" int
-rocksdb_iterator_close (rocksdb_iterator_t *req, rocksdb_iterator_cb cb) {
+rocksdb_iterator_close(rocksdb_iterator_t *req, rocksdb_iterator_cb cb) {
   req->req.cancelable = false;
   req->cb = cb;
 
@@ -814,7 +814,7 @@ rocksdb_iterator_close (rocksdb_iterator_t *req, rocksdb_iterator_cb cb) {
 namespace {
 
 static void
-rocksdb__on_iterator_refresh (uv_work_t *handle) {
+rocksdb__on_iterator_refresh(uv_work_t *handle) {
   auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
 
   auto iterator = reinterpret_cast<Iterator *>(req->handle);
@@ -833,7 +833,7 @@ rocksdb__on_iterator_refresh (uv_work_t *handle) {
 } // namespace
 
 extern "C" int
-rocksdb_iterator_refresh (rocksdb_iterator_t *req, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb) {
+rocksdb_iterator_refresh(rocksdb_iterator_t *req, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb) {
   req->options = options ? *options : rocksdb__default_read_options;
   req->range = range;
   req->reverse = reverse;
@@ -847,7 +847,7 @@ rocksdb_iterator_refresh (rocksdb_iterator_t *req, rocksdb_range_t range, bool r
 namespace {
 
 static void
-rocksdb__on_iterator_read (uv_work_t *handle) {
+rocksdb__on_iterator_read(uv_work_t *handle) {
   auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
 
   auto iterator = reinterpret_cast<Iterator *>(req->handle);
@@ -866,7 +866,7 @@ rocksdb__on_iterator_read (uv_work_t *handle) {
 } // namespace
 
 extern "C" int
-rocksdb_iterator_read (rocksdb_iterator_t *req, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb) {
+rocksdb_iterator_read(rocksdb_iterator_t *req, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb) {
   req->cb = cb;
   req->keys = keys;
   req->values = values;
@@ -881,7 +881,7 @@ rocksdb_iterator_read (rocksdb_iterator_t *req, rocksdb_slice_t *keys, rocksdb_s
 namespace {
 
 static void
-rocksdb__on_after_read (uv_work_t *handle, int status) {
+rocksdb__on_after_read(uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_read_batch_t *>(handle->data);
 
   rocksdb__remove_req(req);
@@ -894,7 +894,7 @@ rocksdb__on_after_read (uv_work_t *handle, int status) {
 }
 
 static void
-rocksdb__on_read (uv_work_t *handle) {
+rocksdb__on_read(uv_work_t *handle) {
   auto req = reinterpret_cast<rocksdb_read_batch_t *>(handle->data);
 
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
@@ -962,7 +962,7 @@ rocksdb__on_read (uv_work_t *handle) {
 } // namespace
 
 extern "C" int
-rocksdb_read (rocksdb_t *db, rocksdb_read_batch_t *req, rocksdb_read_t *reads, char **errors, size_t len, const rocksdb_read_options_t *options, rocksdb_read_batch_cb cb) {
+rocksdb_read(rocksdb_t *db, rocksdb_read_batch_t *req, rocksdb_read_t *reads, char **errors, size_t len, const rocksdb_read_options_t *options, rocksdb_read_batch_cb cb) {
   req->req.db = db;
   req->req.cancelable = true;
   req->options = options ? *options : rocksdb__default_read_options;
@@ -981,7 +981,7 @@ rocksdb_read (rocksdb_t *db, rocksdb_read_batch_t *req, rocksdb_read_t *reads, c
 namespace {
 
 static void
-rocksdb__on_after_write (uv_work_t *handle, int status) {
+rocksdb__on_after_write(uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_write_batch_t *>(handle->data);
 
   rocksdb__remove_req(req);
@@ -994,7 +994,7 @@ rocksdb__on_after_write (uv_work_t *handle, int status) {
 }
 
 static void
-rocksdb__on_write (uv_work_t *handle) {
+rocksdb__on_write(uv_work_t *handle) {
   auto req = reinterpret_cast<rocksdb_write_batch_t *>(handle->data);
 
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
@@ -1037,7 +1037,7 @@ rocksdb__on_write (uv_work_t *handle) {
 } // namespace
 
 extern "C" int
-rocksdb_write (rocksdb_t *db, rocksdb_write_batch_t *req, rocksdb_write_t *writes, size_t len, const rocksdb_write_options_t *options, rocksdb_write_batch_cb cb) {
+rocksdb_write(rocksdb_t *db, rocksdb_write_batch_t *req, rocksdb_write_t *writes, size_t len, const rocksdb_write_options_t *options, rocksdb_write_batch_cb cb) {
   req->req.db = db;
   req->req.cancelable = true;
   req->options = options ? *options : rocksdb__default_write_options;
@@ -1054,7 +1054,7 @@ rocksdb_write (rocksdb_t *db, rocksdb_write_batch_t *req, rocksdb_write_t *write
 }
 
 extern "C" int
-rocksdb_snapshot_create (rocksdb_t *db, rocksdb_snapshot_t *snapshot) {
+rocksdb_snapshot_create(rocksdb_t *db, rocksdb_snapshot_t *snapshot) {
   auto handle = reinterpret_cast<DB *>(db->handle)->GetSnapshot();
 
   if (handle == nullptr) return -1;
@@ -1066,6 +1066,6 @@ rocksdb_snapshot_create (rocksdb_t *db, rocksdb_snapshot_t *snapshot) {
 }
 
 extern "C" void
-rocksdb_snapshot_destroy (rocksdb_snapshot_t *snapshot) {
+rocksdb_snapshot_destroy(rocksdb_snapshot_t *snapshot) {
   reinterpret_cast<DB *>(snapshot->db->handle)->ReleaseSnapshot(reinterpret_cast<const Snapshot *>(snapshot->handle));
 }
