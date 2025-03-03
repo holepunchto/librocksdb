@@ -10,14 +10,14 @@ static rocksdb_column_family_t *family;
 static bool folders_created = false;
 
 static void
-on_close (rocksdb_close_t *req, int status) {
+on_close(rocksdb_close_t *req, int status) {
   assert(status == 0);
 
   assert(req->error == NULL);
 }
 
 static void
-on_open (rocksdb_open_t *req, int status) {
+on_open(rocksdb_open_t *req, int status) {
   int e;
 
   assert(status == 0);
@@ -35,7 +35,7 @@ on_open (rocksdb_open_t *req, int status) {
 }
 
 int
-main () {
+main() {
   int e;
 
   uv_loop_t *loop = uv_default_loop();

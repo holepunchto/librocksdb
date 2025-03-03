@@ -306,61 +306,61 @@ struct rocksdb_s {
 };
 
 int
-rocksdb_init (uv_loop_t *loop, rocksdb_t *db);
+rocksdb_init(uv_loop_t *loop, rocksdb_t *db);
 
 int
-rocksdb_open (rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_open_cb cb);
+rocksdb_open(rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_open_cb cb);
 
 int
-rocksdb_close (rocksdb_t *db, rocksdb_close_t *req, rocksdb_close_cb cb);
+rocksdb_close(rocksdb_t *db, rocksdb_close_t *req, rocksdb_close_cb cb);
 
 int
-rocksdb_suspend (rocksdb_t *db, rocksdb_suspend_t *req, rocksdb_suspend_cb cb);
+rocksdb_suspend(rocksdb_t *db, rocksdb_suspend_t *req, rocksdb_suspend_cb cb);
 
 int
-rocksdb_resume (rocksdb_t *db, rocksdb_resume_t *req, rocksdb_resume_cb cb);
+rocksdb_resume(rocksdb_t *db, rocksdb_resume_t *req, rocksdb_resume_cb cb);
 
 rocksdb_column_family_descriptor_t
-rocksdb_column_family_descriptor (const char *name, const rocksdb_column_family_options_t *options);
+rocksdb_column_family_descriptor(const char *name, const rocksdb_column_family_options_t *options);
 
 rocksdb_column_family_t *
-rocksdb_column_family_default (rocksdb_t *db);
+rocksdb_column_family_default(rocksdb_t *db);
 
 int
-rocksdb_column_family_destroy (rocksdb_t *db, rocksdb_column_family_t *column_family);
+rocksdb_column_family_destroy(rocksdb_t *db, rocksdb_column_family_t *column_family);
 
 rocksdb_slice_t
-rocksdb_slice_init (const char *data, size_t len);
+rocksdb_slice_init(const char *data, size_t len);
 
 void
-rocksdb_slice_destroy (rocksdb_slice_t *slice);
+rocksdb_slice_destroy(rocksdb_slice_t *slice);
 
 rocksdb_slice_t
-rocksdb_slice_empty (void);
+rocksdb_slice_empty(void);
 
 int
-rocksdb_iterator_open (rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb);
+rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb);
 
 int
-rocksdb_iterator_close (rocksdb_iterator_t *req, rocksdb_iterator_cb cb);
+rocksdb_iterator_close(rocksdb_iterator_t *req, rocksdb_iterator_cb cb);
 
 int
-rocksdb_iterator_refresh (rocksdb_iterator_t *req, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb);
+rocksdb_iterator_refresh(rocksdb_iterator_t *req, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb);
 
 int
-rocksdb_iterator_read (rocksdb_iterator_t *req, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb);
+rocksdb_iterator_read(rocksdb_iterator_t *req, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb);
 
 int
-rocksdb_read (rocksdb_t *db, rocksdb_read_batch_t *req, rocksdb_read_t *reads, char **errors, size_t len, const rocksdb_read_options_t *options, rocksdb_read_batch_cb cb);
+rocksdb_read(rocksdb_t *db, rocksdb_read_batch_t *req, rocksdb_read_t *reads, char **errors, size_t len, const rocksdb_read_options_t *options, rocksdb_read_batch_cb cb);
 
 int
-rocksdb_write (rocksdb_t *db, rocksdb_write_batch_t *req, rocksdb_write_t *writes, size_t len, const rocksdb_write_options_t *options, rocksdb_write_batch_cb cb);
+rocksdb_write(rocksdb_t *db, rocksdb_write_batch_t *req, rocksdb_write_t *writes, size_t len, const rocksdb_write_options_t *options, rocksdb_write_batch_cb cb);
 
 int
-rocksdb_snapshot_create (rocksdb_t *db, rocksdb_snapshot_t *snapshot);
+rocksdb_snapshot_create(rocksdb_t *db, rocksdb_snapshot_t *snapshot);
 
 void
-rocksdb_snapshot_destroy (rocksdb_snapshot_t *snapshot);
+rocksdb_snapshot_destroy(rocksdb_snapshot_t *snapshot);
 
 #ifdef __cplusplus
 }

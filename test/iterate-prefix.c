@@ -11,14 +11,14 @@ static rocksdb_t db;
 static rocksdb_column_family_t *family;
 
 static void
-on_close (rocksdb_close_t *req, int status) {
+on_close(rocksdb_close_t *req, int status) {
   assert(status == 0);
 
   assert(req->error == NULL);
 }
 
 static void
-on_iterator_close (rocksdb_iterator_t *req, int status) {
+on_iterator_close(rocksdb_iterator_t *req, int status) {
   int e;
 
   assert(status == 0);
@@ -34,7 +34,7 @@ on_iterator_close (rocksdb_iterator_t *req, int status) {
 }
 
 static void
-on_iterator_read (rocksdb_iterator_t *req, int status) {
+on_iterator_read(rocksdb_iterator_t *req, int status) {
   int e;
 
   assert(status == 0);
@@ -60,7 +60,7 @@ on_iterator_read (rocksdb_iterator_t *req, int status) {
 }
 
 static void
-on_iterator_open (rocksdb_iterator_t *req, int status) {
+on_iterator_open(rocksdb_iterator_t *req, int status) {
   int e;
 
   assert(status == 0);
@@ -73,7 +73,7 @@ on_iterator_open (rocksdb_iterator_t *req, int status) {
 }
 
 static void
-on_write (rocksdb_write_batch_t *req, int status) {
+on_write(rocksdb_write_batch_t *req, int status) {
   int e;
 
   assert(status == 0);
@@ -91,7 +91,7 @@ on_write (rocksdb_write_batch_t *req, int status) {
 }
 
 static void
-on_open (rocksdb_open_t *req, int status) {
+on_open(rocksdb_open_t *req, int status) {
   int e;
 
   assert(status == 0);
@@ -121,7 +121,7 @@ on_open (rocksdb_open_t *req, int status) {
 }
 
 int
-main () {
+main() {
   int e;
 
   loop = uv_default_loop();

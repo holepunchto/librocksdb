@@ -1,0 +1,25 @@
+From 248c0be9b42ee71cbe2d5b441b4d6c750cce3a9b Mon Sep 17 00:00:00 2001
+From: Radek Hubner <rhubner@users.noreply.github.com>
+Date: Fri, 23 Aug 2024 08:38:53 +0200
+Subject: [PATCH] Fix Arm-V7 32bit build.
+
+---
+ .../lock/range/range_tree/lib/portability/toku_time.h        | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/utilities/transactions/lock/range/range_tree/lib/portability/toku_time.h b/utilities/transactions/lock/range/range_tree/lib/portability/toku_time.h
+index 451959aed4d..ddb7606c014 100644
+--- a/utilities/transactions/lock/range/range_tree/lib/portability/toku_time.h
++++ b/utilities/transactions/lock/range/range_tree/lib/portability/toku_time.h
+@@ -133,6 +133,11 @@ static inline tokutime_t toku_time_now(void) {
+   return result;
+ #elif defined(__powerpc__)
+   return __ppc_get_timebase();
++#elif defined(__arm__)
++  uint32_t lo, hi;
++  __asm __volatile__("mrrc p15, 1, %[lo], %[hi], c14"
++                     : [lo] "=r"(lo), [hi] "=r"(hi));
++  return (uint64_t)hi << 32 | lo;
+ #elif defined(__s390x__)
+   uint64_t result;
+   asm volatile("stckf %0" : "=Q"(result) : : "cc");

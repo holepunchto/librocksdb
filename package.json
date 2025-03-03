@@ -12,6 +12,6 @@
   },
   "homepage": "https://github.com/holepunchto/librocksdb#readme",
   "devDependencies": {
-    "cmake-fetch": "^1.0.0"
+    "cmake-fetch": "^1.4.0"
   }
 }
