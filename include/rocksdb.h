@@ -66,7 +66,7 @@ struct rocksdb_options_s {
   uint64_t bytes_per_sync;
 };
 
-/** @version 0 */
+/** @version 1 */
 struct rocksdb_column_family_options_s {
   int version;
 
@@ -93,6 +93,12 @@ struct rocksdb_column_family_options_s {
 
   /** @since 0 */
   uint32_t table_format_version;
+
+  /** @since 1 */
+  bool optimize_filters_for_memory;
+
+  /** @since 1 */
+  bool no_block_cache;
 };
 
 /** @version 0 */

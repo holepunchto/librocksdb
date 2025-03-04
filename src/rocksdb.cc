@@ -32,7 +32,7 @@ static const rocksdb_options_t rocksdb__default_options = {
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
-  .version = 0,
+  .version = 1,
   .compaction_style = rocksdb_compaction_style_level,
   .enable_blob_files = false,
   .min_blob_size = 0,
@@ -41,6 +41,8 @@ static const rocksdb_column_family_options_t rocksdb__default_column_family_opti
   .table_block_size = 4 * 1024,
   .table_cache_index_and_filter_blocks = false,
   .table_format_version = 6,
+  .optimize_filters_for_memory = false,
+  .no_block_cache = false,
 };
 
 static const rocksdb_read_options_t rocksdb__default_read_options = {
@@ -267,7 +269,15 @@ rocksdb__on_open(uv_work_t *handle) {
       &column_family.options, 0
     );
 
+    table_options.optimize_filters_for_memory = rocksdb__option<&rocksdb_column_family_options_t::optimize_filters_for_memory, bool>(
+      &column_family.options, 1
+    );
+
     table_options.filter_policy = std::shared_ptr<const FilterPolicy>(NewBloomFilterPolicy(10.0));
+
+    table_options.no_block_cache = rocksdb__option<&rocksdb_column_family_options_t::no_block_cache, bool>(
+      &column_family.options, 1
+    );
 
     options.table_factory = std::shared_ptr<TableFactory>(NewBlockBasedTableFactory(table_options));
 
