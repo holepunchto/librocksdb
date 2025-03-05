@@ -1,40 +1,18 @@
-From 17ea624ea64bd933d6a2be4fdaee74b18c93be9e Mon Sep 17 00:00:00 2001
-From: Mathias Buus <mathiasbuus@gmail.com>
-Date: Tue, 25 Feb 2025 21:51:03 +0100
-Subject: [PATCH] yolo
-
----
- env/fs_posix.cc | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
 diff --git a/env/fs_posix.cc b/env/fs_posix.cc
-index 82fb9fba337..9fa84be3275 100644
+index 82fb9fba3..fe9b52dbb 100644
 --- a/env/fs_posix.cc
 +++ b/env/fs_posix.cc
-@@ -47,6 +47,10 @@
- #include <set>
- #include <vector>
- 
-+#if defined(__APPLE__)
-+#include <TargetConditionals.h>
-+#endif
-+
- #include "env/composite_env_wrapper.h"
- #include "env/io_posix.h"
- #include "monitoring/iostats_context_imp.h"
-@@ -94,6 +98,11 @@ struct LockHoldingInfo {
+@@ -94,6 +94,9 @@ struct LockHoldingInfo {
  static std::map<std::string, LockHoldingInfo> locked_files;
  static port::Mutex mutex_locked_files;
  
-+#if defined(TARGET_OS_IPHONE)
-+static int LockOrUnlock(int fd, bool lock) {
-+  return 0;
-+}
++#if defined(IOS_CROSS_COMPILE)
++static int LockOrUnlock(int fd, bool lock) { return 0; }
 +#else
  static int LockOrUnlock(int fd, bool lock) {
    errno = 0;
    struct flock f;
-@@ -106,6 +115,7 @@ static int LockOrUnlock(int fd, bool lock) {
+@@ -106,6 +109,7 @@ static int LockOrUnlock(int fd, bool lock) {
  
    return value;
  }

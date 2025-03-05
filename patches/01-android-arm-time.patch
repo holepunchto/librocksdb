@@ -1,12 +1,3 @@
-From 248c0be9b42ee71cbe2d5b441b4d6c750cce3a9b Mon Sep 17 00:00:00 2001
-From: Radek Hubner <rhubner@users.noreply.github.com>
-Date: Fri, 23 Aug 2024 08:38:53 +0200
-Subject: [PATCH] Fix Arm-V7 32bit build.
-
----
- .../lock/range/range_tree/lib/portability/toku_time.h        | 5 +++++
- 1 file changed, 5 insertions(+)
-
 diff --git a/utilities/transactions/lock/range/range_tree/lib/portability/toku_time.h b/utilities/transactions/lock/range/range_tree/lib/portability/toku_time.h
 index 451959aed4d..ddb7606c014 100644
 --- a/utilities/transactions/lock/range/range_tree/lib/portability/toku_time.h
