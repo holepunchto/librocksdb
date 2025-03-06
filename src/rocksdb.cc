@@ -141,10 +141,14 @@ private:
   }
 
   Status RegisterDbPaths(const std::vector<std::string> &paths) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
     return fs->RegisterDbPaths(paths);
   }
 
   Status UnregisterDbPaths(const std::vector<std::string> &paths) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
     return fs->UnregisterDbPaths(paths);
   }
 
@@ -355,6 +359,8 @@ private:
   }
 
   void DiscardCacheForDirectory(const std::string &path) override {
+    if (suspended) return;
+
     fs->DiscardCacheForDirectory(path);
   }
 
