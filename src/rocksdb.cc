@@ -596,7 +596,7 @@ private:
 
     std::unique_ptr<FSDirectory> dir;
 
-    auto status = fs->NewDirectory(name, options, result, dbg);
+    auto status = fs->NewDirectory(name, options, &dir, dbg);
 
     if (status.ok()) {
       auto wrapper = std::make_unique<rocksdb_directory_s>(shared_from_this(), std::move(dir));
