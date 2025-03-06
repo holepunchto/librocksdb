@@ -1189,6 +1189,13 @@ rocksdb__on_iterator_open(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb) {
+  if (
+    (db->state & rocksdb_suspended) != 0 ||
+    (db->state & rocksdb_suspending) != 0
+  ) {
+    return UV_EBUSY;
+  }
+
   req->req.db = db;
   req->req.cancelable = true;
   req->options = options ? *options : rocksdb__default_read_options;
@@ -1219,6 +1226,15 @@ rocksdb__on_iterator_close(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_iterator_close(rocksdb_iterator_t *req, rocksdb_iterator_cb cb) {
+  auto db = req->req.db;
+
+  if (
+    (db->state & rocksdb_suspended) != 0 ||
+    (db->state & rocksdb_suspending) != 0
+  ) {
+    return UV_EBUSY;
+  }
+
   req->req.cancelable = false;
   req->cb = cb;
 
@@ -1250,6 +1266,15 @@ rocksdb__on_iterator_refresh(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_iterator_refresh(rocksdb_iterator_t *req, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb) {
+  auto db = req->req.db;
+
+  if (
+    (db->state & rocksdb_suspended) != 0 ||
+    (db->state & rocksdb_suspending) != 0
+  ) {
+    return UV_EBUSY;
+  }
+
   req->options = options ? *options : rocksdb__default_read_options;
   req->range = range;
   req->reverse = reverse;
@@ -1283,6 +1308,15 @@ rocksdb__on_iterator_read(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_iterator_read(rocksdb_iterator_t *req, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb) {
+  auto db = req->req.db;
+
+  if (
+    (db->state & rocksdb_suspended) != 0 ||
+    (db->state & rocksdb_suspending) != 0
+  ) {
+    return UV_EBUSY;
+  }
+
   req->cb = cb;
   req->keys = keys;
   req->values = values;
@@ -1379,6 +1413,13 @@ rocksdb__on_read(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_read(rocksdb_t *db, rocksdb_read_batch_t *req, rocksdb_read_t *reads, char **errors, size_t len, const rocksdb_read_options_t *options, rocksdb_read_batch_cb cb) {
+  if (
+    (db->state & rocksdb_suspended) != 0 ||
+    (db->state & rocksdb_suspending) != 0
+  ) {
+    return UV_EBUSY;
+  }
+
   req->req.db = db;
   req->req.cancelable = true;
   req->options = options ? *options : rocksdb__default_read_options;
@@ -1454,6 +1495,13 @@ rocksdb__on_write(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_write(rocksdb_t *db, rocksdb_write_batch_t *req, rocksdb_write_t *writes, size_t len, const rocksdb_write_options_t *options, rocksdb_write_batch_cb cb) {
+  if (
+    (db->state & rocksdb_suspended) != 0 ||
+    (db->state & rocksdb_suspending) != 0
+  ) {
+    return UV_EBUSY;
+  }
+
   req->req.db = db;
   req->req.cancelable = true;
   req->options = options ? *options : rocksdb__default_write_options;
