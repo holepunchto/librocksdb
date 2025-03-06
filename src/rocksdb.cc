@@ -63,6 +63,8 @@ struct rocksdb_lock_s : FileLock {
   }
 };
 
+static const auto rocksdb__file_system_busy = IOStatus::Busy("File system is suspended");
+
 struct rocksdb_file_system_s : FileSystem {
   std::shared_ptr<FileSystem> fs;
   std::atomic<bool> suspended;
@@ -123,6 +125,8 @@ private:
       locks.insert(wrapper);
 
       *result = wrapper;
+    } else {
+      *result = nullptr;
     }
 
     return status;
@@ -131,173 +135,173 @@ private:
   IOStatus UnlockFile(FileLock *lock, const IOOptions &options, IODebugContext *dbg) override {
     auto wrapper = reinterpret_cast<rocksdb_lock_t *>(lock);
 
+    if (wrapper->lock == nullptr) return IOStatus::OK();
+
     auto status = fs->UnlockFile(wrapper->lock, options, dbg);
 
-    if (status.ok()) {
-      locks.erase(wrapper);
-    }
+    if (status.ok()) locks.erase(wrapper);
 
     return status;
   }
 
   Status RegisterDbPaths(const std::vector<std::string> &paths) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->RegisterDbPaths(paths);
   }
 
   Status UnregisterDbPaths(const std::vector<std::string> &paths) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->UnregisterDbPaths(paths);
   }
 
   IOStatus NewSequentialFile(const std::string &fname, const FileOptions &file_opts, std::unique_ptr<FSSequentialFile> *result, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->NewSequentialFile(fname, file_opts, result, dbg);
   }
 
   IOStatus NewRandomAccessFile(const std::string &fname, const FileOptions &file_opts, std::unique_ptr<FSRandomAccessFile> *result, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->NewRandomAccessFile(fname, file_opts, result, dbg);
   }
 
   IOStatus NewWritableFile(const std::string &fname, const FileOptions &file_opts, std::unique_ptr<FSWritableFile> *result, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->NewWritableFile(fname, file_opts, result, dbg);
   }
 
   IOStatus ReopenWritableFile(const std::string &fname, const FileOptions &options, std::unique_ptr<FSWritableFile> *result, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->ReopenWritableFile(fname, options, result, dbg);
   }
 
   IOStatus ReuseWritableFile(const std::string &fname, const std::string &old_fname, const FileOptions &file_opts, std::unique_ptr<FSWritableFile> *result, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->ReuseWritableFile(fname, old_fname, file_opts, result, dbg);
   }
 
   IOStatus NewRandomRWFile(const std::string &fname, const FileOptions &options, std::unique_ptr<FSRandomRWFile> *result, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->NewRandomRWFile(fname, options, result, dbg);
   }
 
   IOStatus NewMemoryMappedFileBuffer(const std::string &fname, std::unique_ptr<MemoryMappedFileBuffer> *result) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->NewMemoryMappedFileBuffer(fname, result);
   }
 
   IOStatus NewDirectory(const std::string &name, const IOOptions &io_opts, std::unique_ptr<FSDirectory> *result, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->NewDirectory(name, io_opts, result, dbg);
   }
 
   IOStatus FileExists(const std::string &fname, const IOOptions &options, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->FileExists(fname, options, dbg);
   }
 
   IOStatus GetChildren(const std::string &dir, const IOOptions &options, std::vector<std::string> *result, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->GetChildren(dir, options, result, dbg);
   }
 
   IOStatus GetChildrenFileAttributes(const std::string &dir, const IOOptions &options, std::vector<FileAttributes> *result, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->GetChildrenFileAttributes(dir, options, result, dbg);
   }
 
   IOStatus DeleteFile(const std::string &fname, const IOOptions &options, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->DeleteFile(fname, options, dbg);
   }
 
   IOStatus Truncate(const std::string &fname, size_t size, const IOOptions &options, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->Truncate(fname, size, options, dbg);
   }
 
   IOStatus CreateDir(const std::string &dirname, const IOOptions &options, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->CreateDir(dirname, options, dbg);
   }
 
   IOStatus CreateDirIfMissing(const std::string &dirname, const IOOptions &options, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->CreateDirIfMissing(dirname, options, dbg);
   }
 
   IOStatus DeleteDir(const std::string &dirname, const IOOptions &options, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->DeleteDir(dirname, options, dbg);
   }
 
   IOStatus GetFileSize(const std::string &fname, const IOOptions &options, uint64_t *file_size, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->GetFileSize(fname, options, file_size, dbg);
   }
 
   IOStatus GetFileModificationTime(const std::string &fname, const IOOptions &options, uint64_t *file_mtime, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->GetFileModificationTime(fname, options, file_mtime, dbg);
   }
 
   IOStatus RenameFile(const std::string &src, const std::string &target, const IOOptions &options, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->RenameFile(src, target, options, dbg);
   }
 
   IOStatus LinkFile(const std::string &src, const std::string &target, const IOOptions &options, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->LinkFile(src, target, options, dbg);
   }
 
   IOStatus NumFileLinks(const std::string &fname, const IOOptions &options, uint64_t *count, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->NumFileLinks(fname, options, count, dbg);
   }
 
   IOStatus AreFilesSame(const std::string &first, const std::string &second, const IOOptions &options, bool *res, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->AreFilesSame(first, second, options, res, dbg);
   }
 
   IOStatus GetTestDirectory(const IOOptions &options, std::string *path, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->GetTestDirectory(options, path, dbg);
   }
 
   IOStatus NewLogger(const std::string &fname, const IOOptions &io_opts, std::shared_ptr<Logger> *result, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->NewLogger(fname, io_opts, result, dbg);
   }
 
   IOStatus GetAbsolutePath(const std::string &db_path, const IOOptions &options, std::string *output_path, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->GetAbsolutePath(db_path, options, output_path, dbg);
   }
@@ -335,25 +339,25 @@ private:
   }
 
   IOStatus GetFreeSpace(const std::string &path, const IOOptions &options, uint64_t *diskfree, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->GetFreeSpace(path, options, diskfree, dbg);
   }
 
   IOStatus IsDirectory(const std::string &path, const IOOptions &options, bool *is_dir, IODebugContext *dbg) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->IsDirectory(path, options, is_dir, dbg);
   }
 
   IOStatus Poll(std::vector<void *> &io_handles, size_t min_completions) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->Poll(io_handles, min_completions);
   }
 
   IOStatus AbortIO(std::vector<void *> &io_handles) override {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return rocksdb__file_system_busy;
 
     return fs->AbortIO(io_handles);
   }
