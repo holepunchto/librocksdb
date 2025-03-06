@@ -91,9 +91,8 @@ struct rocksdb_file_system_s : FileSystem {
       for (const auto &lock : locks) {
         auto status = lock->acquire(fs);
 
-        if (status.ok()) {
-          reacquired.insert(lock);
-        } else {
+        if (status.ok()) reacquired.insert(lock);
+        else {
           for (const auto &lock : reacquired) {
             auto status = lock->release(fs);
 
