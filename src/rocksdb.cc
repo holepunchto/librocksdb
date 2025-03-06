@@ -302,6 +302,96 @@ private:
     }
   };
 
+  struct rocksdb_random_rw_file_s : FSRandomRWFile {
+    std::shared_ptr<rocksdb_file_system_t> fs;
+    std::unique_ptr<FSRandomRWFile> file;
+
+    rocksdb_random_rw_file_s(std::shared_ptr<rocksdb_file_system_s> &&fs, std::unique_ptr<FSRandomRWFile> &&file)
+        : fs(std::move(fs)),
+          file(std::move(file)) {}
+
+  private:
+    bool use_direct_io() const override {
+      return file->use_direct_io();
+    }
+
+    size_t GetRequiredBufferAlignment() const override {
+      return file->GetRequiredBufferAlignment();
+    }
+
+    IOStatus Write(uint64_t offset, const Slice &data, const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Write(offset, data, options, dbg);
+    }
+
+    IOStatus Read(uint64_t offset, size_t n, const IOOptions &options, Slice *result, char *scratch, IODebugContext *dbg) const override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Read(offset, n, options, result, scratch, dbg);
+    }
+
+    IOStatus Flush(const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Flush(options, dbg);
+    }
+
+    IOStatus Sync(const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Sync(options, dbg);
+    }
+
+    IOStatus Fsync(const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Fsync(options, dbg);
+    }
+
+    IOStatus Close(const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Close(options, dbg);
+    }
+
+    Temperature GetTemperature() const override {
+      return file->GetTemperature();
+    }
+  };
+
+  struct rocksdb_directory_s : FSDirectory {
+    std::shared_ptr<rocksdb_file_system_t> fs;
+    std::unique_ptr<FSDirectory> dir;
+
+    rocksdb_directory_s(std::shared_ptr<rocksdb_file_system_s> &&fs, std::unique_ptr<FSDirectory> &&dir)
+        : fs(std::move(fs)),
+          dir(std::move(dir)) {}
+
+  private:
+    IOStatus Fsync(const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return dir->Fsync(options, dbg);
+    }
+
+    IOStatus FsyncWithDirOptions(const IOOptions &options, IODebugContext *dbg, const DirFsyncOptions &dir_fsync_options) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return dir->FsyncWithDirOptions(options, dbg, dir_fsync_options);
+    }
+
+    IOStatus Close(const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return dir->Close(options, dbg);
+    }
+
+    size_t GetUniqueId(char *id, size_t max_size) const override {
+      return dir->GetUniqueId(id, max_size);
+    }
+  };
+
 public:
   std::shared_ptr<FileSystem> fs;
   std::atomic<bool> suspended;
@@ -450,31 +540,73 @@ private:
   IOStatus ReopenWritableFile(const std::string &fname, const FileOptions &options, std::unique_ptr<FSWritableFile> *result, IODebugContext *dbg) override {
     if (suspended) return rocksdb__file_system_busy;
 
-    return fs->ReopenWritableFile(fname, options, result, dbg);
+    std::unique_ptr<FSWritableFile> file;
+
+    auto status = fs->ReopenWritableFile(fname, options, &file, dbg);
+
+    if (status.ok()) {
+      auto wrapper = std::make_unique<rocksdb_writable_file_s>(shared_from_this(), std::move(file));
+
+      *result = std::move(wrapper);
+    } else {
+      *result = nullptr;
+    }
+
+    return status;
   }
 
   IOStatus ReuseWritableFile(const std::string &fname, const std::string &old_fname, const FileOptions &options, std::unique_ptr<FSWritableFile> *result, IODebugContext *dbg) override {
     if (suspended) return rocksdb__file_system_busy;
 
-    return fs->ReuseWritableFile(fname, old_fname, options, result, dbg);
+    std::unique_ptr<FSWritableFile> file;
+
+    auto status = fs->ReuseWritableFile(fname, old_fname, options, &file, dbg);
+
+    if (status.ok()) {
+      auto wrapper = std::make_unique<rocksdb_writable_file_s>(shared_from_this(), std::move(file));
+
+      *result = std::move(wrapper);
+    } else {
+      *result = nullptr;
+    }
+
+    return status;
   }
 
   IOStatus NewRandomRWFile(const std::string &fname, const FileOptions &options, std::unique_ptr<FSRandomRWFile> *result, IODebugContext *dbg) override {
     if (suspended) return rocksdb__file_system_busy;
 
-    return fs->NewRandomRWFile(fname, options, result, dbg);
-  }
+    std::unique_ptr<FSRandomRWFile> file;
 
-  IOStatus NewMemoryMappedFileBuffer(const std::string &fname, std::unique_ptr<MemoryMappedFileBuffer> *result) override {
-    if (suspended) return rocksdb__file_system_busy;
+    auto status = fs->NewRandomRWFile(fname, options, &file, dbg);
 
-    return fs->NewMemoryMappedFileBuffer(fname, result);
+    if (status.ok()) {
+      auto wrapper = std::make_unique<rocksdb_random_rw_file_s>(shared_from_this(), std::move(file));
+
+      *result = std::move(wrapper);
+    } else {
+      *result = nullptr;
+    }
+
+    return status;
   }
 
   IOStatus NewDirectory(const std::string &name, const IOOptions &options, std::unique_ptr<FSDirectory> *result, IODebugContext *dbg) override {
     if (suspended) return rocksdb__file_system_busy;
 
-    return fs->NewDirectory(name, options, result, dbg);
+    std::unique_ptr<FSDirectory> dir;
+
+    auto status = fs->NewDirectory(name, options, result, dbg);
+
+    if (status.ok()) {
+      auto wrapper = std::make_unique<rocksdb_directory_s>(shared_from_this(), std::move(dir));
+
+      *result = std::move(wrapper);
+    } else {
+      *result = nullptr;
+    }
+
+    return status;
   }
 
   IOStatus FileExists(const std::string &fname, const IOOptions &options, IODebugContext *dbg) override {
