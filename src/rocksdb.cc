@@ -11,6 +11,7 @@
 #include <rocksdb/env.h>
 #include <rocksdb/file_system.h>
 #include <rocksdb/filter_policy.h>
+#include <rocksdb/io_status.h>
 #include <rocksdb/options.h>
 #include <rocksdb/table.h>
 #include <stdlib.h>
@@ -18,7 +19,6 @@
 #include <uv.h>
 
 #include "../include/rocksdb.h"
-#include "rocksdb/io_status.h"
 
 #undef DeleteFile
 #undef GetCurrentTime
