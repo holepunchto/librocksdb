@@ -172,6 +172,136 @@ private:
     }
   };
 
+  struct rocksdb_writable_file_s : FSWritableFile {
+    std::shared_ptr<rocksdb_file_system_t> fs;
+    std::unique_ptr<FSWritableFile> file;
+
+    rocksdb_writable_file_s(std::shared_ptr<rocksdb_file_system_s> &&fs, std::unique_ptr<FSWritableFile> &&file)
+        : fs(std::move(fs)),
+          file(std::move(file)) {}
+
+  private:
+    bool use_direct_io() const override {
+      return file->use_direct_io();
+    }
+
+    IOStatus Append(const Slice &data, const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Append(data, options, dbg);
+    }
+
+    IOStatus Append(const Slice &data, const IOOptions &options, const DataVerificationInfo &verification_info, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Append(data, options, dbg);
+    }
+
+    IOStatus PositionedAppend(const Slice &data, uint64_t offset, const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->PositionedAppend(data, offset, options, dbg);
+    }
+
+    IOStatus PositionedAppend(const Slice &data, uint64_t offset, const IOOptions &options, const DataVerificationInfo &verification_info, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->PositionedAppend(data, offset, options, dbg);
+    }
+
+    IOStatus Truncate(uint64_t size, const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Truncate(size, options, dbg);
+    }
+
+    IOStatus Close(const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Close(options, dbg);
+    }
+
+    IOStatus Flush(const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Flush(options, dbg);
+    }
+
+    IOStatus Sync(const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Sync(options, dbg);
+    }
+
+    IOStatus Fsync(const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Fsync(options, dbg);
+    }
+
+    bool IsSyncThreadSafe() const override {
+      return file->IsSyncThreadSafe();
+    }
+
+    size_t GetRequiredBufferAlignment() const override {
+      return file->GetRequiredBufferAlignment();
+    }
+
+    void SetWriteLifeTimeHint(Env::WriteLifeTimeHint hint) override {
+      file->SetWriteLifeTimeHint(hint);
+    }
+
+    Env::WriteLifeTimeHint GetWriteLifeTimeHint() override {
+      return file->GetWriteLifeTimeHint();
+    }
+
+    void SetIOPriority(Env::IOPriority pri) override {
+      file->SetIOPriority(pri);
+    }
+
+    Env::IOPriority GetIOPriority() override {
+      return file->GetIOPriority();
+    }
+
+    uint64_t GetFileSize(const IOOptions &options, IODebugContext *dbg) override {
+      return file->GetFileSize(options, dbg);
+    }
+
+    void SetPreallocationBlockSize(size_t size) override {
+      file->SetPreallocationBlockSize(size);
+    }
+
+    void GetPreallocationStatus(size_t *block_size, size_t *last_allocated_block) override {
+      file->GetPreallocationStatus(block_size, last_allocated_block);
+    }
+
+    size_t GetUniqueId(char *id, size_t max_size) const override {
+      return file->GetUniqueId(id, max_size);
+    }
+
+    IOStatus InvalidateCache(size_t offset, size_t length) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->InvalidateCache(offset, length);
+    }
+
+    IOStatus RangeSync(uint64_t offset, uint64_t nbytes, const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->RangeSync(offset, nbytes, options, dbg);
+    }
+
+    void PrepareWrite(size_t offset, size_t len, const IOOptions &options, IODebugContext *dbg) override {
+      return file->PrepareWrite(offset, len, options, dbg);
+    }
+
+    IOStatus Allocate(uint64_t offset, uint64_t len, const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Allocate(offset, len, options, dbg);
+    }
+  };
+
 public:
   std::shared_ptr<FileSystem> fs;
   std::atomic<bool> suspended;
@@ -302,7 +432,19 @@ private:
   IOStatus NewWritableFile(const std::string &fname, const FileOptions &options, std::unique_ptr<FSWritableFile> *result, IODebugContext *dbg) override {
     if (suspended) return rocksdb__file_system_busy;
 
-    return fs->NewWritableFile(fname, options, result, dbg);
+    std::unique_ptr<FSWritableFile> file;
+
+    auto status = fs->NewWritableFile(fname, options, &file, dbg);
+
+    if (status.ok()) {
+      auto wrapper = std::make_unique<rocksdb_writable_file_s>(shared_from_this(), std::move(file));
+
+      *result = std::move(wrapper);
+    } else {
+      *result = nullptr;
+    }
+
+    return status;
   }
 
   IOStatus ReopenWritableFile(const std::string &fname, const FileOptions &options, std::unique_ptr<FSWritableFile> *result, IODebugContext *dbg) override {
