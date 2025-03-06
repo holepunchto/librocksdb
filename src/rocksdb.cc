@@ -20,6 +20,11 @@
 #include "../include/rocksdb.h"
 #include "rocksdb/io_status.h"
 
+#undef DeleteFile
+#undef GetCurrentTime
+#undef GetFreeSpace
+#undef LoadLibrary
+
 typedef struct rocksdb_lock_s rocksdb_lock_t;
 typedef struct rocksdb_file_system_s rocksdb_file_system_t;
 
@@ -71,20 +76,38 @@ struct rocksdb_file_system_s : FileSystem {
 
     if (suspended.compare_exchange_strong(expected, true)) {
       for (const auto &lock : locks) {
-        lock->release(fs);
+        auto status = lock->release(fs);
+
+        assert(status.ok());
       }
     }
   }
 
-  inline void
+  inline auto
   resume() {
-    bool expected = true;
+    if (suspended.load()) {
+      auto reacquired = std::set<rocksdb_lock_t *>();
 
-    if (suspended.compare_exchange_strong(expected, false)) {
       for (const auto &lock : locks) {
-        lock->acquire(fs);
+        auto status = lock->acquire(fs);
+
+        if (status.ok()) {
+          reacquired.insert(lock);
+        } else {
+          for (const auto &lock : reacquired) {
+            auto status = lock->release(fs);
+
+            assert(status.ok());
+          }
+
+          return Status(status);
+        }
       }
+
+      suspended.store(true);
     }
+
+    return Status::OK();
   }
 
 private:
@@ -755,13 +778,13 @@ rocksdb__on_suspend(uv_work_t *handle) {
 
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
-  auto status = db->PauseBackgroundWork();
-
   auto fs = reinterpret_cast<rocksdb_file_system_t *>(db->GetFileSystem());
 
-  fs->suspend();
+  auto status = db->PauseBackgroundWork();
 
   if (status.ok()) {
+    fs->suspend();
+
     req->error = nullptr;
   } else {
     req->error = strdup(status.getState());
@@ -809,12 +832,18 @@ rocksdb__on_resume(uv_work_t *handle) {
 
   auto fs = reinterpret_cast<rocksdb_file_system_t *>(db->GetFileSystem());
 
-  fs->resume();
-
-  auto status = db->ContinueBackgroundWork();
+  auto status = fs->resume();
 
   if (status.ok()) {
-    req->error = nullptr;
+    auto status = db->ContinueBackgroundWork();
+
+    if (status.ok()) {
+      req->error = nullptr;
+    } else {
+      fs->suspend();
+
+      req->error = strdup(status.getState());
+    }
   } else {
     req->error = strdup(status.getState());
   }
