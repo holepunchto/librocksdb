@@ -25,50 +25,157 @@
 #undef GetFreeSpace
 #undef LoadLibrary
 
-typedef struct rocksdb_lock_s rocksdb_lock_t;
 typedef struct rocksdb_file_system_s rocksdb_file_system_t;
 
 using namespace rocksdb;
 
 static_assert(sizeof(Slice) == sizeof(rocksdb_slice_t));
 
-struct rocksdb_lock_s : FileLock {
-  std::string fname;
-  FileLock *lock;
-
-  rocksdb_lock_s(std::string fname, FileLock *lock) : fname(fname), lock(lock) {}
-
-  inline auto
-  release(const std::shared_ptr<FileSystem> &fs) {
-    assert(lock != nullptr);
-
-    IOOptions options;
-    IODebugContext dbg;
-
-    auto status = fs->UnlockFile(lock, options, &dbg);
-
-    if (status.ok()) lock = nullptr;
-
-    return status;
-  }
-
-  inline auto
-  acquire(const std::shared_ptr<FileSystem> &fs) {
-    assert(lock == nullptr);
-
-    IOOptions options;
-    IODebugContext dbg;
-
-    return fs->LockFile(fname, options, &lock, &dbg);
-  }
-};
-
 static const auto rocksdb__file_system_busy = IOStatus::Busy("File system is suspended");
 
-struct rocksdb_file_system_s : FileSystem {
+struct rocksdb_file_system_s : std::enable_shared_from_this<rocksdb_file_system_s>, FileSystem {
+private:
+  struct rocksdb_lock_s : FileLock {
+    std::string fname;
+    FileLock *lock;
+
+    rocksdb_lock_s(std::string fname, FileLock *lock) : fname(fname), lock(lock) {}
+
+    inline auto
+    release(const std::shared_ptr<FileSystem> &fs) {
+      assert(lock != nullptr);
+
+      IOOptions options;
+      IODebugContext dbg;
+
+      auto status = fs->UnlockFile(lock, options, &dbg);
+
+      if (status.ok()) lock = nullptr;
+
+      return status;
+    }
+
+    inline auto
+    acquire(const std::shared_ptr<FileSystem> &fs) {
+      assert(lock == nullptr);
+
+      IOOptions options;
+      IODebugContext dbg;
+
+      return fs->LockFile(fname, options, &lock, &dbg);
+    }
+  };
+
+  struct rocksdb_sequential_file_s : FSSequentialFile {
+    std::shared_ptr<rocksdb_file_system_t> fs;
+    std::unique_ptr<FSSequentialFile> file;
+
+    rocksdb_sequential_file_s(std::shared_ptr<rocksdb_file_system_s> &&fs, std::unique_ptr<FSSequentialFile> &&file)
+        : fs(std::move(fs)),
+          file(std::move(file)) {}
+
+  private:
+    bool use_direct_io() const override {
+      return file->use_direct_io();
+    }
+
+    IOStatus Read(size_t n, const IOOptions &options, Slice *result, char *scratch, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Read(n, options, result, scratch, dbg);
+    }
+
+    IOStatus Skip(uint64_t n) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Skip(n);
+    }
+
+    size_t GetRequiredBufferAlignment() const override {
+      return file->GetRequiredBufferAlignment();
+    }
+
+    IOStatus InvalidateCache(size_t offset, size_t length) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->InvalidateCache(offset, length);
+    }
+
+    IOStatus PositionedRead(uint64_t offset, size_t n, const IOOptions &options, Slice *result, char *scratch, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->PositionedRead(offset, n, options, result, scratch, dbg);
+    }
+
+    Temperature GetTemperature() const override {
+      return file->GetTemperature();
+    }
+  };
+
+  struct rocksdb_random_access_file_s : FSRandomAccessFile {
+    std::shared_ptr<rocksdb_file_system_t> fs;
+    std::unique_ptr<FSRandomAccessFile> file;
+
+    rocksdb_random_access_file_s(std::shared_ptr<rocksdb_file_system_s> &&fs, std::unique_ptr<FSRandomAccessFile> &&file)
+        : fs(std::move(fs)),
+          file(std::move(file)) {}
+
+  private:
+    bool use_direct_io() const override {
+      return file->use_direct_io();
+    }
+
+    IOStatus Read(uint64_t offset, size_t n, const IOOptions &options, Slice *result, char *scratch, IODebugContext *dbg) const override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Read(offset, n, options, result, scratch, dbg);
+    }
+
+    IOStatus Prefetch(uint64_t offset, size_t n, const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->Prefetch(offset, n, options, dbg);
+    }
+
+    IOStatus MultiRead(FSReadRequest *reqs, size_t num_reqs, const IOOptions &options, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->MultiRead(reqs, num_reqs, options, dbg);
+    }
+
+    size_t GetUniqueId(char *id, size_t max_size) const override {
+      return file->GetUniqueId(id, max_size);
+    }
+
+    void Hint(AccessPattern pattern) override {
+      return file->Hint(pattern);
+    }
+
+    size_t GetRequiredBufferAlignment() const override {
+      return file->GetRequiredBufferAlignment();
+    }
+
+    IOStatus InvalidateCache(size_t offset, size_t length) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->InvalidateCache(offset, length);
+    }
+
+    IOStatus ReadAsync(FSReadRequest &req, const IOOptions &options, std::function<void(FSReadRequest &, void *)> cb, void *cb_arg, void **io_handle, IOHandleDeleter *del_fn, IODebugContext *dbg) override {
+      if (fs->suspended) return rocksdb__file_system_busy;
+
+      return file->ReadAsync(req, options, cb, cb_arg, io_handle, del_fn, dbg);
+    }
+
+    Temperature GetTemperature() const override {
+      return file->GetTemperature();
+    }
+  };
+
+public:
   std::shared_ptr<FileSystem> fs;
   std::atomic<bool> suspended;
-  std::set<rocksdb_lock_t *> locks;
+  std::set<rocksdb_lock_s *> locks;
 
   rocksdb_file_system_s() : fs(FileSystem::Default()), suspended(false), locks() {}
 
@@ -88,7 +195,7 @@ struct rocksdb_file_system_s : FileSystem {
   inline auto
   resume() {
     if (suspended.load()) {
-      auto reacquired = std::set<rocksdb_lock_t *>();
+      auto reacquired = std::set<rocksdb_lock_s *>();
 
       for (const auto &lock : locks) {
         auto status = lock->acquire(fs);
@@ -120,7 +227,7 @@ private:
     auto status = fs->LockFile(fname, options, &lock, dbg);
 
     if (status.ok()) {
-      auto wrapper = new rocksdb_lock_t(fname, lock);
+      auto wrapper = new rocksdb_lock_s(fname, lock);
 
       locks.insert(wrapper);
 
@@ -133,7 +240,7 @@ private:
   }
 
   IOStatus UnlockFile(FileLock *lock, const IOOptions &options, IODebugContext *dbg) override {
-    auto wrapper = reinterpret_cast<rocksdb_lock_t *>(lock);
+    auto wrapper = reinterpret_cast<rocksdb_lock_s *>(lock);
 
     if (wrapper->lock == nullptr) return IOStatus::OK();
 
@@ -156,22 +263,46 @@ private:
     return fs->UnregisterDbPaths(paths);
   }
 
-  IOStatus NewSequentialFile(const std::string &fname, const FileOptions &file_opts, std::unique_ptr<FSSequentialFile> *result, IODebugContext *dbg) override {
+  IOStatus NewSequentialFile(const std::string &fname, const FileOptions &options, std::unique_ptr<FSSequentialFile> *result, IODebugContext *dbg) override {
     if (suspended) return rocksdb__file_system_busy;
 
-    return fs->NewSequentialFile(fname, file_opts, result, dbg);
+    std::unique_ptr<FSSequentialFile> file;
+
+    auto status = fs->NewSequentialFile(fname, options, &file, dbg);
+
+    if (status.ok()) {
+      auto wrapper = std::make_unique<rocksdb_sequential_file_s>(shared_from_this(), std::move(file));
+
+      *result = std::move(wrapper);
+    } else {
+      *result = nullptr;
+    }
+
+    return status;
   }
 
-  IOStatus NewRandomAccessFile(const std::string &fname, const FileOptions &file_opts, std::unique_ptr<FSRandomAccessFile> *result, IODebugContext *dbg) override {
+  IOStatus NewRandomAccessFile(const std::string &fname, const FileOptions &options, std::unique_ptr<FSRandomAccessFile> *result, IODebugContext *dbg) override {
     if (suspended) return rocksdb__file_system_busy;
 
-    return fs->NewRandomAccessFile(fname, file_opts, result, dbg);
+    std::unique_ptr<FSRandomAccessFile> file;
+
+    auto status = fs->NewRandomAccessFile(fname, options, &file, dbg);
+
+    if (status.ok()) {
+      auto wrapper = std::make_unique<rocksdb_random_access_file_s>(shared_from_this(), std::move(file));
+
+      *result = std::move(wrapper);
+    } else {
+      *result = nullptr;
+    }
+
+    return status;
   }
 
-  IOStatus NewWritableFile(const std::string &fname, const FileOptions &file_opts, std::unique_ptr<FSWritableFile> *result, IODebugContext *dbg) override {
+  IOStatus NewWritableFile(const std::string &fname, const FileOptions &options, std::unique_ptr<FSWritableFile> *result, IODebugContext *dbg) override {
     if (suspended) return rocksdb__file_system_busy;
 
-    return fs->NewWritableFile(fname, file_opts, result, dbg);
+    return fs->NewWritableFile(fname, options, result, dbg);
   }
 
   IOStatus ReopenWritableFile(const std::string &fname, const FileOptions &options, std::unique_ptr<FSWritableFile> *result, IODebugContext *dbg) override {
@@ -180,10 +311,10 @@ private:
     return fs->ReopenWritableFile(fname, options, result, dbg);
   }
 
-  IOStatus ReuseWritableFile(const std::string &fname, const std::string &old_fname, const FileOptions &file_opts, std::unique_ptr<FSWritableFile> *result, IODebugContext *dbg) override {
+  IOStatus ReuseWritableFile(const std::string &fname, const std::string &old_fname, const FileOptions &options, std::unique_ptr<FSWritableFile> *result, IODebugContext *dbg) override {
     if (suspended) return rocksdb__file_system_busy;
 
-    return fs->ReuseWritableFile(fname, old_fname, file_opts, result, dbg);
+    return fs->ReuseWritableFile(fname, old_fname, options, result, dbg);
   }
 
   IOStatus NewRandomRWFile(const std::string &fname, const FileOptions &options, std::unique_ptr<FSRandomRWFile> *result, IODebugContext *dbg) override {
@@ -198,10 +329,10 @@ private:
     return fs->NewMemoryMappedFileBuffer(fname, result);
   }
 
-  IOStatus NewDirectory(const std::string &name, const IOOptions &io_opts, std::unique_ptr<FSDirectory> *result, IODebugContext *dbg) override {
+  IOStatus NewDirectory(const std::string &name, const IOOptions &options, std::unique_ptr<FSDirectory> *result, IODebugContext *dbg) override {
     if (suspended) return rocksdb__file_system_busy;
 
-    return fs->NewDirectory(name, io_opts, result, dbg);
+    return fs->NewDirectory(name, options, result, dbg);
   }
 
   IOStatus FileExists(const std::string &fname, const IOOptions &options, IODebugContext *dbg) override {
@@ -294,10 +425,10 @@ private:
     return fs->GetTestDirectory(options, path, dbg);
   }
 
-  IOStatus NewLogger(const std::string &fname, const IOOptions &io_opts, std::shared_ptr<Logger> *result, IODebugContext *dbg) override {
+  IOStatus NewLogger(const std::string &fname, const IOOptions &options, std::shared_ptr<Logger> *result, IODebugContext *dbg) override {
     if (suspended) return rocksdb__file_system_busy;
 
-    return fs->NewLogger(fname, io_opts, result, dbg);
+    return fs->NewLogger(fname, options, result, dbg);
   }
 
   IOStatus GetAbsolutePath(const std::string &db_path, const IOOptions &options, std::string *output_path, IODebugContext *dbg) override {
@@ -306,8 +437,8 @@ private:
     return fs->GetAbsolutePath(db_path, options, output_path, dbg);
   }
 
-  void SanitizeFileOptions(FileOptions *opts) const override {
-    return fs->SanitizeFileOptions(opts);
+  void SanitizeFileOptions(FileOptions *file_options) const override {
+    return fs->SanitizeFileOptions(file_options);
   }
 
   FileOptions OptimizeForLogRead(const FileOptions &file_options) const override {
