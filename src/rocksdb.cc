@@ -441,6 +441,7 @@ extern "C" int
 rocksdb_init(uv_loop_t *loop, rocksdb_t *db) {
   db->loop = loop;
   db->handle = nullptr;
+  db->state = 0;
   db->close = NULL;
   db->reqs = NULL;
 
@@ -770,9 +771,15 @@ static inline void
 rocksdb__on_after_suspend(uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_suspend_t *>(handle->data);
 
+  auto db = req->req.db;
+
+  db->state &= ~rocksdb_suspending;
+
   rocksdb__remove_req(req);
 
   auto error = req->error;
+
+  if (error == nullptr) db->state |= rocksdb_suspended;
 
   req->cb(req, status);
 
@@ -804,6 +811,15 @@ rocksdb__on_suspend(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_suspend(rocksdb_t *db, rocksdb_suspend_t *req, rocksdb_suspend_cb cb) {
+  if (
+    (db->state & rocksdb_suspended) != 0 ||
+    (db->state & rocksdb_suspending) != 0
+  ) {
+    return UV_EINVAL;
+  }
+
+  db->state |= rocksdb_suspending;
+
   req->req.db = db;
   req->req.cancelable = true;
   req->error = nullptr;
@@ -822,9 +838,15 @@ static inline void
 rocksdb__on_after_resume(uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_resume_t *>(handle->data);
 
+  auto db = req->req.db;
+
+  db->state &= ~rocksdb_resuming;
+
   rocksdb__remove_req(req);
 
   auto error = req->error;
+
+  if (error == nullptr) db->state &= ~rocksdb_suspended;
 
   req->cb(req, status);
 
@@ -862,6 +884,16 @@ rocksdb__on_resume(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_resume(rocksdb_t *db, rocksdb_resume_t *req, rocksdb_resume_cb cb) {
+  if (
+    (db->state & rocksdb_suspended) == 0 ||
+    (db->state & rocksdb_suspending) != 0 ||
+    (db->state & rocksdb_resuming) != 0
+  ) {
+    return UV_EINVAL;
+  }
+
+  db->state |= rocksdb_resuming;
+
   req->req.db = db;
   req->req.cancelable = true;
   req->error = nullptr;
