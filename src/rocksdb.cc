@@ -1,4 +1,5 @@
 #include <memory>
+#include <set>
 #include <vector>
 
 #include <intrusive.h>
@@ -7,6 +8,8 @@
 #include <rocksdb/advanced_options.h>
 #include <rocksdb/convenience.h>
 #include <rocksdb/db.h>
+#include <rocksdb/env.h>
+#include <rocksdb/file_system.h>
 #include <rocksdb/filter_policy.h>
 #include <rocksdb/options.h>
 #include <rocksdb/table.h>
@@ -15,10 +18,328 @@
 #include <uv.h>
 
 #include "../include/rocksdb.h"
+#include "rocksdb/io_status.h"
+
+typedef struct rocksdb_lock_s rocksdb_lock_t;
+typedef struct rocksdb_file_system_s rocksdb_file_system_t;
 
 using namespace rocksdb;
 
 static_assert(sizeof(Slice) == sizeof(rocksdb_slice_t));
+
+struct rocksdb_lock_s : FileLock {
+  std::string fname;
+  FileLock *lock;
+
+  rocksdb_lock_s(std::string fname, FileLock *lock) : fname(fname), lock(lock) {}
+
+  inline auto
+  release(const std::shared_ptr<FileSystem> &fs) {
+    assert(lock != nullptr);
+
+    IOOptions options;
+    IODebugContext dbg;
+
+    auto status = fs->UnlockFile(lock, options, &dbg);
+
+    if (status.ok()) lock = nullptr;
+
+    return status;
+  }
+
+  inline auto
+  acquire(const std::shared_ptr<FileSystem> &fs) {
+    assert(lock == nullptr);
+
+    IOOptions options;
+    IODebugContext dbg;
+
+    return fs->LockFile(fname, options, &lock, &dbg);
+  }
+};
+
+struct rocksdb_file_system_s : FileSystem {
+  std::shared_ptr<FileSystem> fs;
+  std::atomic<bool> suspended;
+  std::set<rocksdb_lock_t *> locks;
+
+  rocksdb_file_system_s() : fs(FileSystem::Default()), suspended(false), locks() {}
+
+  inline void
+  suspend() {
+    auto expected = false;
+
+    if (suspended.compare_exchange_strong(expected, true)) {
+      for (const auto &lock : locks) {
+        lock->release(fs);
+      }
+    }
+  }
+
+  inline void
+  resume() {
+    bool expected = true;
+
+    if (suspended.compare_exchange_strong(expected, false)) {
+      for (const auto &lock : locks) {
+        lock->acquire(fs);
+      }
+    }
+  }
+
+private:
+  const char *Name() const override { return "RocksFS"; }
+
+  IOStatus LockFile(const std::string &fname, const IOOptions &options, FileLock **result, IODebugContext *dbg) override {
+    FileLock *lock;
+
+    auto status = fs->LockFile(fname, options, &lock, dbg);
+
+    if (status.ok()) {
+      auto wrapper = new rocksdb_lock_t(fname, lock);
+
+      locks.insert(wrapper);
+
+      *result = wrapper;
+    }
+
+    return status;
+  }
+
+  IOStatus UnlockFile(FileLock *lock, const IOOptions &options, IODebugContext *dbg) override {
+    auto wrapper = reinterpret_cast<rocksdb_lock_t *>(lock);
+
+    auto status = fs->UnlockFile(wrapper->lock, options, dbg);
+
+    if (status.ok()) {
+      locks.erase(wrapper);
+    }
+
+    return status;
+  }
+
+  Status RegisterDbPaths(const std::vector<std::string> &paths) override {
+    return fs->RegisterDbPaths(paths);
+  }
+
+  Status UnregisterDbPaths(const std::vector<std::string> &paths) override {
+    return fs->UnregisterDbPaths(paths);
+  }
+
+  IOStatus NewSequentialFile(const std::string &fname, const FileOptions &file_opts, std::unique_ptr<FSSequentialFile> *result, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->NewSequentialFile(fname, file_opts, result, dbg);
+  }
+
+  IOStatus NewRandomAccessFile(const std::string &fname, const FileOptions &file_opts, std::unique_ptr<FSRandomAccessFile> *result, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->NewRandomAccessFile(fname, file_opts, result, dbg);
+  }
+
+  IOStatus NewWritableFile(const std::string &fname, const FileOptions &file_opts, std::unique_ptr<FSWritableFile> *result, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->NewWritableFile(fname, file_opts, result, dbg);
+  }
+
+  IOStatus ReopenWritableFile(const std::string &fname, const FileOptions &options, std::unique_ptr<FSWritableFile> *result, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->ReopenWritableFile(fname, options, result, dbg);
+  }
+
+  IOStatus ReuseWritableFile(const std::string &fname, const std::string &old_fname, const FileOptions &file_opts, std::unique_ptr<FSWritableFile> *result, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->ReuseWritableFile(fname, old_fname, file_opts, result, dbg);
+  }
+
+  IOStatus NewRandomRWFile(const std::string &fname, const FileOptions &options, std::unique_ptr<FSRandomRWFile> *result, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->NewRandomRWFile(fname, options, result, dbg);
+  }
+
+  IOStatus NewMemoryMappedFileBuffer(const std::string &fname, std::unique_ptr<MemoryMappedFileBuffer> *result) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->NewMemoryMappedFileBuffer(fname, result);
+  }
+
+  IOStatus NewDirectory(const std::string &name, const IOOptions &io_opts, std::unique_ptr<FSDirectory> *result, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->NewDirectory(name, io_opts, result, dbg);
+  }
+
+  IOStatus FileExists(const std::string &fname, const IOOptions &options, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->FileExists(fname, options, dbg);
+  }
+
+  IOStatus GetChildren(const std::string &dir, const IOOptions &options, std::vector<std::string> *result, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->GetChildren(dir, options, result, dbg);
+  }
+
+  IOStatus GetChildrenFileAttributes(const std::string &dir, const IOOptions &options, std::vector<FileAttributes> *result, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->GetChildrenFileAttributes(dir, options, result, dbg);
+  }
+
+  IOStatus DeleteFile(const std::string &fname, const IOOptions &options, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->DeleteFile(fname, options, dbg);
+  }
+
+  IOStatus Truncate(const std::string &fname, size_t size, const IOOptions &options, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->Truncate(fname, size, options, dbg);
+  }
+
+  IOStatus CreateDir(const std::string &dirname, const IOOptions &options, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->CreateDir(dirname, options, dbg);
+  }
+
+  IOStatus CreateDirIfMissing(const std::string &dirname, const IOOptions &options, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->CreateDirIfMissing(dirname, options, dbg);
+  }
+
+  IOStatus DeleteDir(const std::string &dirname, const IOOptions &options, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->DeleteDir(dirname, options, dbg);
+  }
+
+  IOStatus GetFileSize(const std::string &fname, const IOOptions &options, uint64_t *file_size, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->GetFileSize(fname, options, file_size, dbg);
+  }
+
+  IOStatus GetFileModificationTime(const std::string &fname, const IOOptions &options, uint64_t *file_mtime, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->GetFileModificationTime(fname, options, file_mtime, dbg);
+  }
+
+  IOStatus RenameFile(const std::string &src, const std::string &target, const IOOptions &options, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->RenameFile(src, target, options, dbg);
+  }
+
+  IOStatus LinkFile(const std::string &src, const std::string &target, const IOOptions &options, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->LinkFile(src, target, options, dbg);
+  }
+
+  IOStatus NumFileLinks(const std::string &fname, const IOOptions &options, uint64_t *count, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->NumFileLinks(fname, options, count, dbg);
+  }
+
+  IOStatus AreFilesSame(const std::string &first, const std::string &second, const IOOptions &options, bool *res, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->AreFilesSame(first, second, options, res, dbg);
+  }
+
+  IOStatus GetTestDirectory(const IOOptions &options, std::string *path, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->GetTestDirectory(options, path, dbg);
+  }
+
+  IOStatus NewLogger(const std::string &fname, const IOOptions &io_opts, std::shared_ptr<Logger> *result, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->NewLogger(fname, io_opts, result, dbg);
+  }
+
+  IOStatus GetAbsolutePath(const std::string &db_path, const IOOptions &options, std::string *output_path, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->GetAbsolutePath(db_path, options, output_path, dbg);
+  }
+
+  void SanitizeFileOptions(FileOptions *opts) const override {
+    return fs->SanitizeFileOptions(opts);
+  }
+
+  FileOptions OptimizeForLogRead(const FileOptions &file_options) const override {
+    return fs->OptimizeForLogRead(file_options);
+  }
+
+  FileOptions OptimizeForManifestRead(const FileOptions &file_options) const override {
+    return fs->OptimizeForManifestRead(file_options);
+  }
+
+  FileOptions OptimizeForLogWrite(const FileOptions &file_options, const DBOptions &db_options) const override {
+    return fs->OptimizeForLogWrite(file_options, db_options);
+  }
+
+  FileOptions OptimizeForManifestWrite(const FileOptions &file_options) const override {
+    return fs->OptimizeForManifestWrite(file_options);
+  }
+
+  FileOptions OptimizeForCompactionTableWrite(const FileOptions &file_options, const ImmutableDBOptions &db_options) const override {
+    return fs->OptimizeForCompactionTableWrite(file_options, db_options);
+  }
+
+  FileOptions OptimizeForCompactionTableRead(const FileOptions &file_options, const ImmutableDBOptions &db_options) const override {
+    return fs->OptimizeForCompactionTableRead(file_options, db_options);
+  }
+
+  FileOptions OptimizeForBlobFileRead(const FileOptions &file_options, const ImmutableDBOptions &db_options) const override {
+    return fs->OptimizeForBlobFileRead(file_options, db_options);
+  }
+
+  IOStatus GetFreeSpace(const std::string &path, const IOOptions &options, uint64_t *diskfree, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->GetFreeSpace(path, options, diskfree, dbg);
+  }
+
+  IOStatus IsDirectory(const std::string &path, const IOOptions &options, bool *is_dir, IODebugContext *dbg) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->IsDirectory(path, options, is_dir, dbg);
+  }
+
+  IOStatus Poll(std::vector<void *> &io_handles, size_t min_completions) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->Poll(io_handles, min_completions);
+  }
+
+  IOStatus AbortIO(std::vector<void *> &io_handles) override {
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    return fs->AbortIO(io_handles);
+  }
+
+  void DiscardCacheForDirectory(const std::string &path) override {
+    fs->DiscardCacheForDirectory(path);
+  }
+
+  void SupportedOps(int64_t &supported_ops) override {
+    fs->SupportedOps(supported_ops);
+  }
+};
 
 namespace {
 
@@ -284,6 +605,10 @@ rocksdb__on_open(uv_work_t *handle) {
     column_families[i] = ColumnFamilyDescriptor(column_family.name, options);
   }
 
+  auto env = NewCompositeEnv(std::make_shared<rocksdb_file_system_t>());
+
+  options.env = env.release();
+
   auto handles = std::vector<ColumnFamilyHandle *>(req->len);
 
   Status status;
@@ -358,7 +683,10 @@ rocksdb__on_close(uv_work_t *handle) {
     req->error = strdup(status.getState());
   }
 
+  auto env = db->GetEnv();
+
   delete db;
+  delete env;
 }
 
 } // namespace
@@ -429,6 +757,10 @@ rocksdb__on_suspend(uv_work_t *handle) {
 
   auto status = db->PauseBackgroundWork();
 
+  auto fs = reinterpret_cast<rocksdb_file_system_t *>(db->GetFileSystem());
+
+  fs->suspend();
+
   if (status.ok()) {
     req->error = nullptr;
   } else {
@@ -474,6 +806,10 @@ rocksdb__on_resume(uv_work_t *handle) {
   auto req = reinterpret_cast<rocksdb_resume_t *>(handle->data);
 
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
+
+  auto fs = reinterpret_cast<rocksdb_file_system_t *>(db->GetFileSystem());
+
+  fs->resume();
 
   auto status = db->ContinueBackgroundWork();
 
