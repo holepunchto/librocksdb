@@ -1226,15 +1226,6 @@ rocksdb__on_iterator_close(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_iterator_close(rocksdb_iterator_t *req, rocksdb_iterator_cb cb) {
-  auto db = req->req.db;
-
-  if (
-    (db->state & rocksdb_suspended) != 0 ||
-    (db->state & rocksdb_suspending) != 0
-  ) {
-    return UV_EBUSY;
-  }
-
   req->req.cancelable = false;
   req->cb = cb;
 
