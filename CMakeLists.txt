@@ -52,6 +52,7 @@ target_sources(
   INTERFACE
     include/rocksdb.h
   PRIVATE
+    src/fs.h
     src/rocksdb.cc
 )
 
