@@ -443,7 +443,7 @@ private:
     pending.fetch_sub(1, std::memory_order_release);
 
     if (pending.load(std::memory_order_acquire) == 0) {
-      std::lock_guard lock(mutex);
+      std::scoped_lock lock(mutex);
 
       drained.notify_all();
     }
