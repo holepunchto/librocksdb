@@ -1,5 +1,6 @@
 #include <memory>
 #include <set>
+#include <thread>
 
 #include <rocksdb/convenience.h>
 #include <rocksdb/env.h>
@@ -377,15 +378,20 @@ private:
 public:
   std::shared_ptr<FileSystem> fs;
   std::atomic<bool> suspended;
+  std::atomic<int> pending;
   std::set<rocksdb_lock_s *> locks;
 
-  rocksdb_file_system_s() : fs(FileSystem::Default()), suspended(false), locks() {}
+  rocksdb_file_system_s() : fs(FileSystem::Default()), suspended(false), pending(0), locks() {}
 
   inline void
   suspend() {
     auto expected = false;
 
     if (suspended.compare_exchange_strong(expected, true)) {
+      while (pending.load(std::memory_order_acquire) > 0) {
+        std::this_thread::yield();
+      }
+
       for (const auto &lock : locks) {
         auto status = lock->release(fs);
 
@@ -424,7 +430,15 @@ private:
   template <typename T>
   inline T
   unless_suspended(const std::function<T()> &fn) {
-    return suspended ? IOStatus::Busy("File system is suspended") : fn();
+    if (suspended) return IOStatus::Busy("File system is suspended");
+
+    pending.fetch_add(1, std::memory_order_acquire);
+
+    T result = fn();
+
+    pending.fetch_sub(1, std::memory_order_release);
+
+    return result;
   }
 
 private:
