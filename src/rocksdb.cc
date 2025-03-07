@@ -15,6 +15,7 @@
 #include <uv.h>
 
 #include "../include/rocksdb.h"
+#include "fs.h"
 
 using namespace rocksdb;
 
@@ -88,6 +89,7 @@ extern "C" int
 rocksdb_init(uv_loop_t *loop, rocksdb_t *db) {
   db->loop = loop;
   db->handle = nullptr;
+  db->state = 0;
   db->close = NULL;
   db->reqs = NULL;
 
@@ -284,6 +286,10 @@ rocksdb__on_open(uv_work_t *handle) {
     column_families[i] = ColumnFamilyDescriptor(column_family.name, options);
   }
 
+  auto env = NewCompositeEnv(std::make_shared<rocksdb_file_system_t>());
+
+  options.env = env.release();
+
   auto handles = std::vector<ColumnFamilyHandle *>(req->len);
 
   Status status;
@@ -358,7 +364,10 @@ rocksdb__on_close(uv_work_t *handle) {
     req->error = strdup(status.getState());
   }
 
+  auto env = db->GetEnv();
+
   delete db;
+  delete env;
 }
 
 } // namespace
@@ -410,9 +419,15 @@ static inline void
 rocksdb__on_after_suspend(uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_suspend_t *>(handle->data);
 
+  auto db = req->req.db;
+
+  db->state &= ~rocksdb_suspending;
+
   rocksdb__remove_req(req);
 
   auto error = req->error;
+
+  if (error == nullptr) db->state |= rocksdb_suspended;
 
   req->cb(req, status);
 
@@ -427,9 +442,13 @@ rocksdb__on_suspend(uv_work_t *handle) {
 
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
+  auto fs = reinterpret_cast<rocksdb_file_system_t *>(db->GetFileSystem());
+
   auto status = db->PauseBackgroundWork();
 
   if (status.ok()) {
+    fs->suspend();
+
     req->error = nullptr;
   } else {
     req->error = strdup(status.getState());
@@ -440,6 +459,15 @@ rocksdb__on_suspend(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_suspend(rocksdb_t *db, rocksdb_suspend_t *req, rocksdb_suspend_cb cb) {
+  if (
+    (db->state & rocksdb_suspended) != 0 ||
+    (db->state & rocksdb_suspending) != 0
+  ) {
+    return UV_EINVAL;
+  }
+
+  db->state |= rocksdb_suspending;
+
   req->req.db = db;
   req->req.cancelable = true;
   req->error = nullptr;
@@ -458,9 +486,15 @@ static inline void
 rocksdb__on_after_resume(uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_resume_t *>(handle->data);
 
+  auto db = req->req.db;
+
+  db->state &= ~rocksdb_resuming;
+
   rocksdb__remove_req(req);
 
   auto error = req->error;
+
+  if (error == nullptr) db->state &= ~rocksdb_suspended;
 
   req->cb(req, status);
 
@@ -475,10 +509,20 @@ rocksdb__on_resume(uv_work_t *handle) {
 
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
-  auto status = db->ContinueBackgroundWork();
+  auto fs = reinterpret_cast<rocksdb_file_system_t *>(db->GetFileSystem());
+
+  auto status = fs->resume();
 
   if (status.ok()) {
-    req->error = nullptr;
+    auto status = db->ContinueBackgroundWork();
+
+    if (status.ok()) {
+      req->error = nullptr;
+    } else {
+      fs->suspend();
+
+      req->error = strdup(status.getState());
+    }
   } else {
     req->error = strdup(status.getState());
   }
@@ -488,6 +532,16 @@ rocksdb__on_resume(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_resume(rocksdb_t *db, rocksdb_resume_t *req, rocksdb_resume_cb cb) {
+  if (
+    (db->state & rocksdb_suspended) == 0 ||
+    (db->state & rocksdb_suspending) != 0 ||
+    (db->state & rocksdb_resuming) != 0
+  ) {
+    return UV_EINVAL;
+  }
+
+  db->state |= rocksdb_resuming;
+
   req->req.db = db;
   req->req.cancelable = true;
   req->error = nullptr;
@@ -783,6 +837,13 @@ rocksdb__on_iterator_open(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb) {
+  if (
+    (db->state & rocksdb_suspended) != 0 ||
+    (db->state & rocksdb_suspending) != 0
+  ) {
+    return UV_EBUSY;
+  }
+
   req->req.db = db;
   req->req.cancelable = true;
   req->options = options ? *options : rocksdb__default_read_options;
@@ -844,6 +905,15 @@ rocksdb__on_iterator_refresh(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_iterator_refresh(rocksdb_iterator_t *req, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb) {
+  auto db = req->req.db;
+
+  if (
+    (db->state & rocksdb_suspended) != 0 ||
+    (db->state & rocksdb_suspending) != 0
+  ) {
+    return UV_EBUSY;
+  }
+
   req->options = options ? *options : rocksdb__default_read_options;
   req->range = range;
   req->reverse = reverse;
@@ -877,6 +947,15 @@ rocksdb__on_iterator_read(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_iterator_read(rocksdb_iterator_t *req, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb) {
+  auto db = req->req.db;
+
+  if (
+    (db->state & rocksdb_suspended) != 0 ||
+    (db->state & rocksdb_suspending) != 0
+  ) {
+    return UV_EBUSY;
+  }
+
   req->cb = cb;
   req->keys = keys;
   req->values = values;
@@ -973,6 +1052,13 @@ rocksdb__on_read(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_read(rocksdb_t *db, rocksdb_read_batch_t *req, rocksdb_read_t *reads, char **errors, size_t len, const rocksdb_read_options_t *options, rocksdb_read_batch_cb cb) {
+  if (
+    (db->state & rocksdb_suspended) != 0 ||
+    (db->state & rocksdb_suspending) != 0
+  ) {
+    return UV_EBUSY;
+  }
+
   req->req.db = db;
   req->req.cancelable = true;
   req->options = options ? *options : rocksdb__default_read_options;
@@ -1048,6 +1134,13 @@ rocksdb__on_write(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_write(rocksdb_t *db, rocksdb_write_batch_t *req, rocksdb_write_t *writes, size_t len, const rocksdb_write_options_t *options, rocksdb_write_batch_cb cb) {
+  if (
+    (db->state & rocksdb_suspended) != 0 ||
+    (db->state & rocksdb_suspending) != 0
+  ) {
+    return UV_EBUSY;
+  }
+
   req->req.db = db;
   req->req.cancelable = true;
   req->options = options ? *options : rocksdb__default_write_options;

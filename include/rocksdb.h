@@ -301,10 +301,18 @@ struct rocksdb_snapshot_s {
   const void *handle; // Opaque snapshot pointer
 };
 
+enum {
+  rocksdb_suspending = 0x1,
+  rocksdb_suspended = 0x2,
+  rocksdb_resuming = 0x4,
+};
+
 struct rocksdb_s {
   uv_loop_t *loop;
 
   void *handle; // Opaque database pointer
+
+  int state;
 
   intrusive_ring_t *reqs;
 

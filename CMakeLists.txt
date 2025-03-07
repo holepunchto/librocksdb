@@ -27,7 +27,6 @@ fetch_package(
   SOURCE_DIR rocksdb_dir
   PATCHES
     patches/01-android-arm-time.patch
-    patches/02-disable-ios-lock-file.patch
 )
 
 # Neuter the C bindings from RocksDB to ensure they don't collide with ours
@@ -53,6 +52,7 @@ target_sources(
   INTERFACE
     include/rocksdb.h
   PRIVATE
+    src/fs.h
     src/rocksdb.cc
 )
 
