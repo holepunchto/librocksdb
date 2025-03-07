@@ -379,18 +379,22 @@ public:
   std::shared_ptr<FileSystem> fs;
   std::atomic<bool> suspended;
   std::atomic<int> pending;
+  std::mutex mutex;
+  std::condition_variable drained;
   std::set<rocksdb_lock_s *> locks;
 
-  rocksdb_file_system_s() : fs(FileSystem::Default()), suspended(false), pending(0), locks() {}
+  rocksdb_file_system_s() : fs(FileSystem::Default()), suspended(false), pending(0), mutex(), drained(), locks() {}
 
   inline void
   suspend() {
     auto expected = false;
 
     if (suspended.compare_exchange_strong(expected, true)) {
-      while (pending.load(std::memory_order_acquire) > 0) {
-        std::this_thread::yield();
-      }
+      std::unique_lock lock(mutex);
+
+      drained.wait(lock, [this] {
+        return pending.load(std::memory_order_acquire) == 0;
+      });
 
       for (const auto &lock : locks) {
         auto status = lock->release(fs);
@@ -437,6 +441,12 @@ private:
     T result = fn();
 
     pending.fetch_sub(1, std::memory_order_release);
+
+    if (pending.load(std::memory_order_acquire) == 0) {
+      std::lock_guard lock(mutex);
+
+      drained.notify_all();
+    }
 
     return result;
   }
