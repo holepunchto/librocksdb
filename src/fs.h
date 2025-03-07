@@ -436,7 +436,7 @@ private:
   template <typename T>
   inline T
   unless_suspended(const std::function<T()> &fn) {
-    if (suspended) return IOStatus::Busy("File system is suspended");
+    if (suspended) return T::Busy("File system is suspended");
 
     pending.fetch_add(1, std::memory_order_acquire);
 
