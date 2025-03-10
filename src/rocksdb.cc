@@ -501,7 +501,7 @@ rocksdb__on_suspend(uv_work_t *handle) {
 
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
-  auto fs = reinterpret_cast<rocksdb_file_system_t *>(db->GetFileSystem());
+  auto fs = static_cast<rocksdb_file_system_t *>(db->GetFileSystem());
 
   auto status = db->PauseBackgroundWork();
 
@@ -568,7 +568,7 @@ rocksdb__on_resume(uv_work_t *handle) {
 
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
-  auto fs = reinterpret_cast<rocksdb_file_system_t *>(db->GetFileSystem());
+  auto fs = static_cast<rocksdb_file_system_t *>(db->GetFileSystem());
 
   auto status = fs->resume();
 
