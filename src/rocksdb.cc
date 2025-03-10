@@ -24,17 +24,19 @@ static_assert(sizeof(Slice) == sizeof(rocksdb_slice_t));
 namespace {
 
 static const rocksdb_options_t rocksdb__default_options = {
-  .version = 0,
+  .version = 1,
   .read_only = false,
   .create_if_missing = false,
   .create_missing_column_families = false,
   .max_background_jobs = 2,
   .bytes_per_sync = 0,
+  .max_open_files = -1,
+  .use_direct_reads = false,
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
-  .version = 1,
-  .compaction_style = rocksdb_compaction_style_level,
+  .version = 2,
+  .compaction_style = rocksdb_level_compaction,
   .enable_blob_files = false,
   .min_blob_size = 0,
   .blob_file_size = 1 << 28,
@@ -44,6 +46,9 @@ static const rocksdb_column_family_options_t rocksdb__default_column_family_opti
   .table_format_version = 6,
   .optimize_filters_for_memory = false,
   .no_block_cache = false,
+  .filter_policy = (rocksdb_filter_policy_t) {
+    .type = rocksdb_no_filter_policy,
+  }
 };
 
 static const rocksdb_read_options_t rocksdb__default_read_options = {
@@ -180,6 +185,14 @@ rocksdb__on_open(uv_work_t *handle) {
     &req->options, 0
   );
 
+  options.max_open_files = rocksdb__option<&rocksdb_options_t::max_open_files, int>(
+    &req->options, 1
+  );
+
+  options.use_direct_reads = rocksdb__option<&rocksdb_options_t::use_direct_reads, bool>(
+    &req->options, 1
+  );
+
   auto read_only = rocksdb__option<&rocksdb_options_t::read_only, bool>(
     &req->options, 0
   );
@@ -237,9 +250,28 @@ rocksdb__on_open(uv_work_t *handle) {
 
     ColumnFamilyOptions options;
 
-    options.compaction_style = rocksdb__option<&rocksdb_column_family_options_t::compaction_style, CompactionStyle>(
+    auto compaction_style = rocksdb__option<&rocksdb_column_family_options_t::compaction_style, rocksdb_compaction_style_t>(
       &column_family.options, 0
     );
+
+    switch (compaction_style) {
+    case rocksdb_level_compaction:
+      options.compaction_style = CompactionStyle::kCompactionStyleLevel;
+      break;
+
+    case rocksdb_universal_compaction:
+      options.compaction_style = CompactionStyle::kCompactionStyleUniversal;
+      break;
+
+    case rocksdb_fifo_compaction:
+      options.compaction_style = CompactionStyle::kCompactionStyleFIFO;
+      break;
+
+    case rocksdb_no_compaction:
+    default:
+      options.compaction_style = CompactionStyle::kCompactionStyleNone;
+      break;
+    }
 
     options.enable_blob_files = rocksdb__option<&rocksdb_column_family_options_t::enable_blob_files, bool>(
       &column_family.options, 0
@@ -275,11 +307,32 @@ rocksdb__on_open(uv_work_t *handle) {
       &column_family.options, 1
     );
 
-    table_options.filter_policy = std::shared_ptr<const FilterPolicy>(NewBloomFilterPolicy(10.0));
-
     table_options.no_block_cache = rocksdb__option<&rocksdb_column_family_options_t::no_block_cache, bool>(
       &column_family.options, 1
     );
+
+    auto filter_policy = rocksdb__option<&rocksdb_column_family_options_t::filter_policy, rocksdb_filter_policy_t>(
+      &column_family.options, 2
+    );
+
+    switch (filter_policy.type) {
+    case rocksdb_bloom_filter_policy:
+      table_options.filter_policy = std::shared_ptr<const FilterPolicy>(
+        NewBloomFilterPolicy(filter_policy.bloom.bits_per_key)
+      );
+      break;
+
+    case rocksdb_ribbon_filter_policy:
+      table_options.filter_policy = std::shared_ptr<const FilterPolicy>(
+        NewRibbonFilterPolicy(filter_policy.ribbon.bloom_equivalent_bits_per_key, filter_policy.ribbon.bloom_before_level)
+      );
+      break;
+
+    case rocksdb_no_filter_policy:
+    default:
+      table_options.filter_policy = nullptr;
+      break;
+    }
 
     options.table_factory = std::shared_ptr<TableFactory>(NewBlockBasedTableFactory(table_options));
 

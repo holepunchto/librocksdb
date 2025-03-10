@@ -11,6 +11,9 @@ extern "C" {
 #include <uv.h>
 
 typedef struct rocksdb_options_s rocksdb_options_t;
+typedef struct rocksdb_bloom_filter_options_s rocksdb_bloom_filter_options_t;
+typedef struct rocksdb_ribbon_filter_options_s rocksdb_ribbon_filter_options_t;
+typedef struct rocksdb_filter_policy_s rocksdb_filter_policy_t;
 typedef struct rocksdb_column_family_options_s rocksdb_column_family_options_t;
 typedef struct rocksdb_read_options_s rocksdb_read_options_t;
 typedef struct rocksdb_write_options_s rocksdb_write_options_t;
@@ -39,14 +42,7 @@ typedef void (*rocksdb_iterator_cb)(rocksdb_iterator_t *iterator, int status);
 typedef void (*rocksdb_read_batch_cb)(rocksdb_read_batch_t *batch, int status);
 typedef void (*rocksdb_write_batch_cb)(rocksdb_write_batch_t *batch, int status);
 
-typedef enum {
-  rocksdb_compaction_style_level = 0,
-  rocksdb_compaction_style_universal = 1,
-  rocksdb_compaction_style_fifo = 2,
-  rocksdb_compaction_style_none = 3,
-} rocksdb_compaction_style_t;
-
-/** @version 0 */
+/** @version 1 */
 struct rocksdb_options_s {
   int version;
 
@@ -64,9 +60,56 @@ struct rocksdb_options_s {
 
   /** @since 0 */
   uint64_t bytes_per_sync;
+
+  /** @since 1 */
+  int max_open_files;
+
+  /** @since 1 */
+  bool use_direct_reads;
 };
 
-/** @version 1 */
+typedef enum {
+  rocksdb_no_compaction = 0,
+  rocksdb_level_compaction = 1,
+  rocksdb_universal_compaction = 2,
+  rocksdb_fifo_compaction = 3,
+} rocksdb_compaction_style_t;
+
+typedef enum {
+  rocksdb_no_filter_policy = 0,
+  rocksdb_bloom_filter_policy = 1,
+  rocksdb_ribbon_filter_policy = 2,
+} rocksdb_filter_policy_type_t;
+
+/** @version 0 */
+struct rocksdb_bloom_filter_options_s {
+  int version;
+
+  /** @since 0 */
+  double bits_per_key;
+};
+
+/** @version 0 */
+struct rocksdb_ribbon_filter_options_s {
+  int version;
+
+  /** @since 0 */
+  double bloom_equivalent_bits_per_key;
+
+  /** @since 0 */
+  int bloom_before_level;
+};
+
+struct rocksdb_filter_policy_s {
+  rocksdb_filter_policy_type_t type;
+
+  union {
+    rocksdb_bloom_filter_options_t bloom;
+    rocksdb_ribbon_filter_options_t ribbon;
+  };
+};
+
+/** @version 2 */
 struct rocksdb_column_family_options_s {
   int version;
 
@@ -99,6 +142,9 @@ struct rocksdb_column_family_options_s {
 
   /** @since 1 */
   bool no_block_cache;
+
+  /** @since 2 */
+  rocksdb_filter_policy_t filter_policy;
 };
 
 /** @version 0 */
