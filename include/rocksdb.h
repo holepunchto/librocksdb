@@ -46,7 +46,7 @@ typedef enum {
   rocksdb_compaction_style_none = 3,
 } rocksdb_compaction_style_t;
 
-/** @version 0 */
+/** @version 1 */
 struct rocksdb_options_s {
   int version;
 
@@ -64,6 +64,12 @@ struct rocksdb_options_s {
 
   /** @since 0 */
   uint64_t bytes_per_sync;
+
+  /** @since 1 */
+  int max_open_files;
+
+  /** @since 1 */
+  bool use_direct_reads;
 };
 
 /** @version 1 */

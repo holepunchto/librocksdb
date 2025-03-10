@@ -30,6 +30,8 @@ static const rocksdb_options_t rocksdb__default_options = {
   .create_missing_column_families = false,
   .max_background_jobs = 2,
   .bytes_per_sync = 0,
+  .max_open_files = -1,
+  .use_direct_reads = false,
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
@@ -180,6 +182,14 @@ rocksdb__on_open(uv_work_t *handle) {
     &req->options, 0
   );
 
+  options.max_open_files = rocksdb__option<&rocksdb_options_t::max_open_files, int>(
+    &req->options, 1
+  );
+
+  options.use_direct_reads = rocksdb__option<&rocksdb_options_t::use_direct_reads, bool>(
+    &req->options, 1
+  );
+
   auto read_only = rocksdb__option<&rocksdb_options_t::read_only, bool>(
     &req->options, 0
   );
@@ -274,8 +284,6 @@ rocksdb__on_open(uv_work_t *handle) {
     table_options.optimize_filters_for_memory = rocksdb__option<&rocksdb_column_family_options_t::optimize_filters_for_memory, bool>(
       &column_family.options, 1
     );
-
-    table_options.filter_policy = std::shared_ptr<const FilterPolicy>(NewBloomFilterPolicy(10.0));
 
     table_options.no_block_cache = rocksdb__option<&rocksdb_column_family_options_t::no_block_cache, bool>(
       &column_family.options, 1
