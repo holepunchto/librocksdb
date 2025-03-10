@@ -347,21 +347,27 @@ rocksdb__on_open(uv_work_t *handle) {
 
   Status status;
 
-  auto db = reinterpret_cast<DB **>(&req->req.db->handle);
+  std::unique_ptr<DB> ptr;
 
   if (read_only) {
-    status = DB::OpenForReadOnly(options, req->path, column_families, &handles, db);
+    status = DB::OpenForReadOnly(options, req->path, column_families, &handles, &ptr);
   } else {
-    status = DB::Open(options, req->path, column_families, &handles, db);
+    status = DB::Open(options, req->path, column_families, &handles, &ptr);
   }
 
   for (size_t i = 0, n = req->len; i < n; i++) {
     req->handles[i] = reinterpret_cast<rocksdb_column_family_t *>(handles[i]);
   }
 
+  auto db = req->req.db;
+
   if (status.ok()) {
+    db->handle = ptr.release();
+
     req->error = nullptr;
   } else {
+    db->handle = nullptr;
+
     req->error = strdup(status.getState());
   }
 }

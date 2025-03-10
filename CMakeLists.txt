@@ -23,7 +23,7 @@ fetch_package("github:holepunchto/libpath")
 fetch_package("github:holepunchto/libintrusive")
 
 fetch_package(
-  "github:facebook/rocksdb@9.10.0"
+  "github:facebook/rocksdb@9.11.1"
   SOURCE_DIR rocksdb_dir
   PATCHES
     patches/01-android-arm-time.patch
