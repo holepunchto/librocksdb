@@ -331,6 +331,7 @@ rocksdb__on_open(uv_work_t *handle) {
     case rocksdb_no_filter_policy:
     default:
       table_options.filter_policy = nullptr;
+      break;
     }
 
     options.table_factory = std::shared_ptr<TableFactory>(NewBlockBasedTableFactory(table_options));
