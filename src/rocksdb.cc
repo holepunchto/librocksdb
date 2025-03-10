@@ -24,7 +24,7 @@ static_assert(sizeof(Slice) == sizeof(rocksdb_slice_t));
 namespace {
 
 static const rocksdb_options_t rocksdb__default_options = {
-  .version = 0,
+  .version = 1,
   .read_only = false,
   .create_if_missing = false,
   .create_missing_column_families = false,
