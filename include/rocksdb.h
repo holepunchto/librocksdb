@@ -17,6 +17,7 @@ typedef struct rocksdb_filter_policy_s rocksdb_filter_policy_t;
 typedef struct rocksdb_column_family_options_s rocksdb_column_family_options_t;
 typedef struct rocksdb_read_options_s rocksdb_read_options_t;
 typedef struct rocksdb_write_options_s rocksdb_write_options_t;
+typedef struct rocksdb_flush_options_s rocksdb_flush_options_t;
 typedef struct rocksdb_column_family_s rocksdb_column_family_t;
 typedef struct rocksdb_column_family_descriptor_s rocksdb_column_family_descriptor_t;
 typedef struct rocksdb_req_s rocksdb_req_t;
@@ -31,6 +32,7 @@ typedef struct rocksdb_read_s rocksdb_read_t;
 typedef struct rocksdb_read_batch_s rocksdb_read_batch_t;
 typedef struct rocksdb_write_s rocksdb_write_t;
 typedef struct rocksdb_write_batch_s rocksdb_write_batch_t;
+typedef struct rocksdb_flush_s rocksdb_flush_t;
 typedef struct rocksdb_snapshot_s rocksdb_snapshot_t;
 typedef struct rocksdb_s rocksdb_t;
 
@@ -41,6 +43,7 @@ typedef void (*rocksdb_resume_cb)(rocksdb_resume_t *req, int status);
 typedef void (*rocksdb_iterator_cb)(rocksdb_iterator_t *iterator, int status);
 typedef void (*rocksdb_read_batch_cb)(rocksdb_read_batch_t *batch, int status);
 typedef void (*rocksdb_write_batch_cb)(rocksdb_write_batch_t *batch, int status);
+typedef void (*rocksdb_flush_cb)(rocksdb_flush_t *req, int status);
 
 /** @version 1 */
 struct rocksdb_options_s {
@@ -157,6 +160,11 @@ struct rocksdb_read_options_s {
 
 /** @version 0 */
 struct rocksdb_write_options_s {
+  int version;
+};
+
+/** @version 0 */
+struct rocksdb_flush_options_s {
   int version;
 };
 
@@ -341,6 +349,20 @@ struct rocksdb_write_batch_s {
   void *data;
 };
 
+struct rocksdb_flush_s {
+  rocksdb_req_t req;
+
+  rocksdb_flush_options_t options;
+
+  rocksdb_column_family_t *column_family;
+
+  char *error;
+
+  rocksdb_flush_cb cb;
+
+  void *data;
+};
+
 struct rocksdb_snapshot_s {
   rocksdb_t *db;
 
@@ -415,6 +437,9 @@ rocksdb_read(rocksdb_t *db, rocksdb_read_batch_t *req, rocksdb_read_t *reads, ch
 
 int
 rocksdb_write(rocksdb_t *db, rocksdb_write_batch_t *req, rocksdb_write_t *writes, size_t len, const rocksdb_write_options_t *options, rocksdb_write_batch_cb cb);
+
+int
+rocksdb_flush(rocksdb_t *db, rocksdb_flush_t *req, rocksdb_column_family_t *column_family, const rocksdb_flush_options_t *options, rocksdb_flush_cb cb);
 
 int
 rocksdb_snapshot_create(rocksdb_t *db, rocksdb_snapshot_t *snapshot);

@@ -5,6 +5,7 @@ list(APPEND tests
   iterate-prefix
   open-close
   open-close-immediately
+  write-flush
   write-read
   write-read-snapshot
 )

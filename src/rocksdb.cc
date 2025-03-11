@@ -60,6 +60,10 @@ static const rocksdb_write_options_t rocksdb__default_write_options = {
   .version = 0,
 };
 
+static const rocksdb_flush_options_t rocksdb__default_flush_options = {
+  .version = 0,
+};
+
 } // namespace
 
 namespace {
@@ -1213,6 +1217,65 @@ rocksdb_write(rocksdb_t *db, rocksdb_write_batch_t *req, rocksdb_write_t *writes
   rocksdb__add_req(req);
 
   return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_write, rocksdb__on_after_write);
+}
+
+namespace {
+
+static void
+rocksdb__on_after_flush(uv_work_t *handle, int status) {
+  auto req = reinterpret_cast<rocksdb_flush_t *>(handle->data);
+
+  rocksdb__remove_req(req);
+
+  auto error = req->error;
+
+  req->cb(req, status);
+
+  if (error) free(error);
+}
+
+static void
+rocksdb__on_flush(uv_work_t *handle) {
+  auto req = reinterpret_cast<rocksdb_flush_t *>(handle->data);
+
+  auto db = reinterpret_cast<DB *>(req->req.db->handle);
+
+  auto column_family = reinterpret_cast<ColumnFamilyHandle *>(req->column_family);
+
+  FlushOptions options;
+
+  auto status = db->Flush(options, column_family);
+
+  if (status.ok()) {
+    req->error = nullptr;
+  } else {
+    req->error = strdup(status.getState());
+  }
+}
+
+} // namespace
+
+extern "C" int
+rocksdb_flush(rocksdb_t *db, rocksdb_flush_t *req, rocksdb_column_family_t *column_family, const rocksdb_flush_options_t *options, rocksdb_flush_cb cb) {
+  if (
+    (db->state & rocksdb_suspended) != 0 ||
+    (db->state & rocksdb_suspending) != 0
+  ) {
+    return UV_EBUSY;
+  }
+
+  req->req.db = db;
+  req->req.cancelable = true;
+  req->column_family = column_family;
+  req->options = options ? *options : rocksdb__default_flush_options;
+  req->error = nullptr;
+  req->cb = cb;
+
+  req->req.worker.data = static_cast<void *>(req);
+
+  rocksdb__add_req(req);
+
+  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_flush, rocksdb__on_after_flush);
 }
 
 extern "C" int
