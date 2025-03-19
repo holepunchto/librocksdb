@@ -448,7 +448,7 @@ public:
         }
       }
 
-      suspended.store(true);
+      suspended.store(false);
     }
 
     return Status::OK();
