@@ -99,8 +99,8 @@ rocksdb_init(uv_loop_t *loop, rocksdb_t *db) {
   db->loop = loop;
   db->handle = nullptr;
   db->state = 0;
-  db->close = NULL;
-  db->reqs = NULL;
+  db->close = nullptr;
+  db->reqs = nullptr;
 
   return 0;
 }
@@ -120,7 +120,7 @@ rocksdb__add_req(rocksdb_t *db, rocksdb_req_t *req) {
 
   intrusive_ring_init(ring);
 
-  if (db->reqs == NULL) {
+  if (db->reqs == nullptr) {
     db->reqs = ring;
   } else {
     db->reqs = intrusive_ring_link(ring, db->reqs);
@@ -463,9 +463,9 @@ static inline int
 rocksdb__close_maybe(rocksdb_t *db) {
   rocksdb_close_t *req = db->close;
 
-  if (db->reqs || req == NULL) return 0;
+  if (db->reqs || req == nullptr) return 0;
 
-  if (db->handle == NULL) {
+  if (db->handle == nullptr) {
     req->cb(req, 0);
 
     return 0;
