@@ -404,6 +404,8 @@ static inline void
 rocksdb__on_after_close(uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_close_t *>(handle->data);
 
+  req->req.db->handle = nullptr;
+
   auto error = req->error;
 
   req->cb(req, status);
@@ -464,6 +466,8 @@ rocksdb__close_maybe(rocksdb_t *db) {
   rocksdb_close_t *req = db->close;
 
   if (db->reqs || req == nullptr) return 0;
+
+  db->close = nullptr;
 
   if (db->handle == nullptr) {
     req->cb(req, 0);
