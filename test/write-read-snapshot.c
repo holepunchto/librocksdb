@@ -54,10 +54,8 @@ on_first_read(rocksdb_read_batch_t *req, int status) {
   read.key = rocksdb_slice_init("hello", 5);
   read.value = rocksdb_slice_empty();
 
-  static char *error;
-
   static rocksdb_read_batch_t batch;
-  e = rocksdb_read(&db, &batch, &read, &error, 1, NULL, on_second_read);
+  e = rocksdb_read(&db, &batch, &read, 1, NULL, on_second_read);
   assert(e == 0);
 }
 
@@ -75,15 +73,13 @@ on_second_write(rocksdb_write_batch_t *req, int status) {
   read.key = rocksdb_slice_init("hello", 5);
   read.value = rocksdb_slice_empty();
 
-  static char *error;
-
   rocksdb_read_options_t options = {
     .version = 0,
     .snapshot = &snapshot,
   };
 
   static rocksdb_read_batch_t batch;
-  e = rocksdb_read(&db, &batch, &read, &error, 1, &options, on_first_read);
+  e = rocksdb_read(&db, &batch, &read, 1, &options, on_first_read);
   assert(e == 0);
 }
 

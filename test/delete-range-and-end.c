@@ -69,10 +69,8 @@ on_delete(rocksdb_write_batch_t *req, int status) {
   V(4, "e")
 #undef V
 
-  static char *errors[5];
-
   static rocksdb_read_batch_t batch;
-  e = rocksdb_read(&db, &batch, reads, errors, 5, NULL, on_read);
+  e = rocksdb_read(&db, &batch, reads, 5, NULL, on_read);
   assert(e == 0);
 }
 

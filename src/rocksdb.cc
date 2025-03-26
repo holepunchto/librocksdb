@@ -1042,10 +1042,15 @@ rocksdb__on_after_read(uv_work_t *handle, int status) {
 
   rocksdb__remove_req(req);
 
+  auto errors = req->errors;
+  auto len = req->len;
+
   req->cb(req, status);
 
-  for (size_t i = 0, n = req->len; i < n; i++) {
-    if (req->errors[i]) free(req->errors[i]);
+  if (errors) {
+    for (size_t i = 0, n = len; i < n; i++) {
+      if (errors[i]) free(errors[i]);
+    }
   }
 }
 
@@ -1086,6 +1091,8 @@ rocksdb__on_read(uv_work_t *handle) {
 
     db->MultiGet(options, req->len, column_families.data(), keys.data(), values.data(), statuses.data());
 
+    req->errors = new char *[req->len];
+
     for (size_t i = 0, n = req->len; i < n; i++) {
       auto op = &req->reads[i];
 
@@ -1118,7 +1125,7 @@ rocksdb__on_read(uv_work_t *handle) {
 } // namespace
 
 extern "C" int
-rocksdb_read(rocksdb_t *db, rocksdb_read_batch_t *req, rocksdb_read_t *reads, char **errors, size_t len, const rocksdb_read_options_t *options, rocksdb_read_batch_cb cb) {
+rocksdb_read(rocksdb_t *db, rocksdb_read_batch_t *req, rocksdb_read_t *reads, size_t len, const rocksdb_read_options_t *options, rocksdb_read_batch_cb cb) {
   if (
     (db->state & rocksdb_suspended) != 0 ||
     (db->state & rocksdb_suspending) != 0
@@ -1130,7 +1137,7 @@ rocksdb_read(rocksdb_t *db, rocksdb_read_batch_t *req, rocksdb_read_t *reads, ch
   req->req.cancelable = true;
   req->options = options ? *options : rocksdb__default_read_options;
   req->reads = reads;
-  req->errors = errors;
+  req->errors = nullptr;
   req->len = len;
   req->cb = cb;
 

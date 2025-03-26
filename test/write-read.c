@@ -49,10 +49,8 @@ on_write(rocksdb_write_batch_t *req, int status) {
   read.key = rocksdb_slice_init("hello", 5);
   read.value = rocksdb_slice_empty();
 
-  static char *error;
-
   static rocksdb_read_batch_t batch;
-  e = rocksdb_read(&db, &batch, &read, &error, 1, NULL, on_read);
+  e = rocksdb_read(&db, &batch, &read, 1, NULL, on_read);
   assert(e == 0);
 }
 
