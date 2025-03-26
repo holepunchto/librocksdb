@@ -1051,6 +1051,8 @@ rocksdb__on_after_read(uv_work_t *handle, int status) {
     for (size_t i = 0, n = len; i < n; i++) {
       if (errors[i]) free(errors[i]);
     }
+
+    delete[] errors;
   }
 }
 
