@@ -1,0 +1,14 @@
+diff --git a/utilities/transactions/optimistic_transaction_db_impl.cc b/utilities/transactions/optimistic_transaction_db_impl.cc
+index 3ad9d5177..ad8067f9a 100644
+--- a/utilities/transactions/optimistic_transaction_db_impl.cc
++++ b/utilities/transactions/optimistic_transaction_db_impl.cc
+@@ -101,7 +101,9 @@ Status OptimisticTransactionDB::Open(
+ void OptimisticTransactionDBImpl::ReinitializeTransaction(
+     Transaction* txn, const WriteOptions& write_options,
+     const OptimisticTransactionOptions& txn_options) {
++#ifdef ROCKSDB_USE_RTTI
+   assert(dynamic_cast<OptimisticTransaction*>(txn) != nullptr);
++#endif
+   auto txn_impl = static_cast<OptimisticTransaction*>(txn);
+ 
+   txn_impl->Reinitialize(this, write_options, txn_options);
