@@ -12,7 +12,7 @@ set(WITH_TESTS OFF CACHE BOOL "Build the RocksDB test suite" FORCE)
 
 set(WITH_GFLAGS OFF CACHE BOOL "Build RocksDB with gflags support" FORCE)
 
-set(USE_RTTI ON CACHE BOOL "Enable RTTI in builds" FORCE)
+set(USE_RTTI OFF CACHE BOOL "Enable RTTI in builds" FORCE)
 
 set(FAIL_ON_WARNINGS OFF CACHE BOOL "Treat compile warnings as errors" FORCE)
 
