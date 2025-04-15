@@ -76,6 +76,20 @@ target_link_libraries(
     intrusive
 )
 
+if(WIN32)
+  target_compile_options(
+    rocksdb
+    PUBLIC
+      /GR-
+  )
+else()
+  target_compile_options(
+    rocksdb
+    PUBLIC
+      -fno-rtti
+  )
+endif()
+
 add_library(rocksdb_shared SHARED)
 
 set_target_properties(

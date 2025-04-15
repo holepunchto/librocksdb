@@ -12,3 +12,27 @@ index 3ad9d5177..ad8067f9a 100644
    auto txn_impl = static_cast<OptimisticTransaction*>(txn);
  
    txn_impl->Reinitialize(this, write_options, txn_options);
+diff --git a/utilities/transactions/transaction_base.cc b/utilities/transactions/transaction_base.cc
+index 063cc02b4..d26558901 100644
+--- a/utilities/transactions/transaction_base.cc
++++ b/utilities/transactions/transaction_base.cc
+@@ -73,7 +73,9 @@ TransactionBaseImpl::TransactionBaseImpl(
+                          write_options.protection_bytes_per_key,
+                          0 /* default_cf_ts_sz */),
+       indexing_enabled_(true) {
++#ifdef ROCKSDB_USE_RTTI
+   assert(dynamic_cast<DBImpl*>(db_) != nullptr);
++#endif
+   log_number_ = 0;
+   if (dbimpl_->allow_2pc()) {
+     InitWriteBatch();
+@@ -897,7 +899,9 @@ Status TransactionBaseImpl::RebuildFromWriteBatch(WriteBatch* src_batch) {
+     DBImpl* db_;
+     IndexedWriteBatchBuilder(Transaction* txn, DBImpl* db)
+         : txn_(txn), db_(db) {
++#ifdef ROCKSDB_USE_RTTI
+       assert(dynamic_cast<TransactionBaseImpl*>(txn_) != nullptr);
++#endif
+     }
+ 
+     Status PutCF(uint32_t cf, const Slice& key, const Slice& val) override {
