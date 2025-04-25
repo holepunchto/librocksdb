@@ -844,7 +844,7 @@ rocksdb__iterator_read(Iterator *iterator, T *req) {
     auto i = req->len++;
 
     req->keys[i] = rocksdb__slice_copy(iterator->key());
-    req->values[i] = rocksdb__slice_copy(iterator->value());
+    if (!req->keys_only) req->values[i] = rocksdb__slice_copy(iterator->value());
 
     rocksdb__iterator_next(iterator, req);
   }
@@ -903,7 +903,7 @@ rocksdb__on_iterator_open(uv_work_t *handle) {
 } // namespace
 
 extern "C" int
-rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb) {
+rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, bool reverse, bool keys_only, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb) {
   if (
     (db->state & rocksdb_suspended) != 0 ||
     (db->state & rocksdb_suspending) != 0
@@ -917,6 +917,7 @@ rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_fam
   req->column_family = column_family;
   req->range = range;
   req->reverse = reverse;
+  req->keys_only = keys_only;
   req->cb = cb;
 
   req->req.worker.data = static_cast<void *>(req);

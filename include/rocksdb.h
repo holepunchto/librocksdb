@@ -259,6 +259,7 @@ struct rocksdb_iterator_s {
 
   rocksdb_range_t range;
   bool reverse;
+  bool keys_only;
 
   size_t len;
   size_t capacity;
@@ -421,7 +422,7 @@ rocksdb_slice_t
 rocksdb_slice_empty(void);
 
 int
-rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb);
+rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, bool reverse, bool keys_only, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb);
 
 int
 rocksdb_iterator_close(rocksdb_iterator_t *req, rocksdb_iterator_cb cb);
