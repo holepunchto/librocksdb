@@ -17,6 +17,7 @@ typedef struct rocksdb_filter_policy_s rocksdb_filter_policy_t;
 typedef struct rocksdb_column_family_options_s rocksdb_column_family_options_t;
 typedef struct rocksdb_read_options_s rocksdb_read_options_t;
 typedef struct rocksdb_write_options_s rocksdb_write_options_t;
+typedef struct rocksdb_iterator_options_s rocksdb_iterator_options_t;
 typedef struct rocksdb_flush_options_s rocksdb_flush_options_t;
 typedef struct rocksdb_column_family_s rocksdb_column_family_t;
 typedef struct rocksdb_column_family_descriptor_s rocksdb_column_family_descriptor_t;
@@ -164,6 +165,20 @@ struct rocksdb_write_options_s {
 };
 
 /** @version 0 */
+struct rocksdb_iterator_options_s {
+  int version;
+
+  /** @since 0 */
+  bool reverse;
+
+  /** @since 0 */
+  bool keys_only;
+
+  /** @since 0 */
+  rocksdb_snapshot_t *snapshot;
+};
+
+/** @version 0 */
 struct rocksdb_flush_options_s {
   int version;
 };
@@ -251,14 +266,13 @@ struct rocksdb_range_s {
 struct rocksdb_iterator_s {
   rocksdb_req_t req;
 
-  rocksdb_read_options_t options;
+  rocksdb_iterator_options_t options;
 
   rocksdb_column_family_t *column_family;
 
   void *handle; // Opaque iterator pointer
 
   rocksdb_range_t range;
-  bool reverse;
 
   size_t len;
   size_t capacity;
@@ -421,13 +435,13 @@ rocksdb_slice_t
 rocksdb_slice_empty(void);
 
 int
-rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb);
+rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, const rocksdb_iterator_options_t *options, rocksdb_iterator_cb cb);
 
 int
 rocksdb_iterator_close(rocksdb_iterator_t *req, rocksdb_iterator_cb cb);
 
 int
-rocksdb_iterator_refresh(rocksdb_iterator_t *req, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb);
+rocksdb_iterator_refresh(rocksdb_iterator_t *req, rocksdb_range_t range, const rocksdb_iterator_options_t *options, rocksdb_iterator_cb cb);
 
 int
 rocksdb_iterator_read(rocksdb_iterator_t *req, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb);
