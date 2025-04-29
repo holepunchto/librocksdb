@@ -173,6 +173,9 @@ struct rocksdb_iterator_options_s {
 
   /** @since 0 */
   bool keys_only;
+
+  /** @since 0 */
+  rocksdb_snapshot_t *snapshot;
 };
 
 /** @version 0 */
@@ -263,8 +266,7 @@ struct rocksdb_range_s {
 struct rocksdb_iterator_s {
   rocksdb_req_t req;
 
-  rocksdb_read_options_t read_options;
-  rocksdb_iterator_options_t iterator_options;
+  rocksdb_iterator_options_t options;
 
   rocksdb_column_family_t *column_family;
 
@@ -433,13 +435,13 @@ rocksdb_slice_t
 rocksdb_slice_empty(void);
 
 int
-rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, const rocksdb_read_options_t *read_options, const rocksdb_iterator_options_t *iterator_options, rocksdb_iterator_cb cb);
+rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, const rocksdb_iterator_options_t *options, rocksdb_iterator_cb cb);
 
 int
 rocksdb_iterator_close(rocksdb_iterator_t *req, rocksdb_iterator_cb cb);
 
 int
-rocksdb_iterator_refresh(rocksdb_iterator_t *req, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb);
+rocksdb_iterator_refresh(rocksdb_iterator_t *req, rocksdb_range_t range, const rocksdb_iterator_options_t *options, rocksdb_iterator_cb cb);
 
 int
 rocksdb_iterator_read(rocksdb_iterator_t *req, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb);

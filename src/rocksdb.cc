@@ -55,6 +55,7 @@ static const rocksdb_iterator_options_t rocksdb__default_iterator_options = {
   .version = 0,
   .reverse = false,
   .keys_only = false,
+  .snapshot = nullptr,
 };
 
 static const rocksdb_read_options_t rocksdb__default_read_options = {
@@ -83,6 +84,12 @@ rocksdb__option(const rocksdb_options_t *options, int min_version, T fallback = 
 template <auto rocksdb_column_family_options_t::*P, typename T>
 static inline T
 rocksdb__option(const rocksdb_column_family_options_t *options, int min_version, T fallback = T(rocksdb__default_column_family_options.*P)) {
+  return options->version >= min_version ? T(options->*P) : fallback;
+}
+
+template <auto rocksdb_iterator_options_t::*P, typename T>
+static inline T
+rocksdb__option(const rocksdb_iterator_options_t *options, int min_version, T fallback = T(rocksdb__default_iterator_options.*P)) {
   return options->version >= min_version ? T(options->*P) : fallback;
 }
 
@@ -762,7 +769,7 @@ static inline void
 rocksdb__iterator_seek(Iterator *iterator, T *req) {
   const auto &range = req->range;
 
-  if (req->iterator_options.reverse) {
+  if (req->options.reverse) {
     rocksdb__iterator_seek<true>(iterator, range);
   } else {
     rocksdb__iterator_seek<false>(iterator, range);
@@ -782,7 +789,7 @@ rocksdb__iterator_next(Iterator *iterator) {
 template <typename T>
 static inline void
 rocksdb__iterator_next(Iterator *iterator, T *req) {
-  if (req->iterator_options.reverse) {
+  if (req->options.reverse) {
     rocksdb__iterator_next<true>(iterator);
   } else {
     rocksdb__iterator_next<false>(iterator);
@@ -826,8 +833,8 @@ rocksdb__iterator_open(T *req) {
 
   const auto &range = req->range;
 
-  auto snapshot = rocksdb__option<&rocksdb_read_options_t::snapshot, rocksdb_snapshot_t *>(
-    &req->read_options, 0
+  auto snapshot = rocksdb__option<&rocksdb_iterator_options_t::snapshot, rocksdb_snapshot_t *>(
+    &req->options, 0
   );
 
   ReadOptions options;
@@ -836,7 +843,7 @@ rocksdb__iterator_open(T *req) {
 
   auto column_family = reinterpret_cast<ColumnFamilyHandle *>(req->column_family);
 
-  if (req->iterator_options.reverse) {
+  if (req->options.reverse) {
     return rocksdb__iterator_open<true>(db, options, column_family, range);
   } else {
     return rocksdb__iterator_open<false>(db, options, column_family, range);
@@ -851,7 +858,7 @@ rocksdb__iterator_read(Iterator *iterator, T *req) {
 
     req->keys[i] = rocksdb__slice_copy(iterator->key());
 
-    if (!req->iterator_options.keys_only) {
+    if (!req->options.keys_only) {
       req->values[i] = rocksdb__slice_copy(iterator->value());
     }
 
@@ -862,8 +869,8 @@ rocksdb__iterator_read(Iterator *iterator, T *req) {
 template <typename T>
 static inline void
 rocksdb__iterator_refresh(Iterator *iterator, T *req) {
-  auto snapshot = rocksdb__option<&rocksdb_read_options_t::snapshot, rocksdb_snapshot_t *>(
-    &req->read_options, 0
+  auto snapshot = rocksdb__option<&rocksdb_iterator_options_t::snapshot, rocksdb_snapshot_t *>(
+    &req->options, 0
   );
 
   if (snapshot) {
@@ -912,7 +919,7 @@ rocksdb__on_iterator_open(uv_work_t *handle) {
 } // namespace
 
 extern "C" int
-rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, const rocksdb_read_options_t *read_options, const rocksdb_iterator_options_t *iterator_options, rocksdb_iterator_cb cb) {
+rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, const rocksdb_iterator_options_t *options, rocksdb_iterator_cb cb) {
   if (
     (db->state & rocksdb_suspended) != 0 ||
     (db->state & rocksdb_suspending) != 0
@@ -922,8 +929,7 @@ rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_fam
 
   req->req.db = db;
   req->req.cancelable = true;
-  req->read_options = read_options ? *read_options : rocksdb__default_read_options;
-  req->iterator_options = iterator_options ? *iterator_options : rocksdb__default_iterator_options;
+  req->options = options ? *options : rocksdb__default_iterator_options;
   req->column_family = column_family;
   req->range = range;
   req->cb = cb;
@@ -980,7 +986,7 @@ rocksdb__on_iterator_refresh(uv_work_t *handle) {
 } // namespace
 
 extern "C" int
-rocksdb_iterator_refresh(rocksdb_iterator_t *req, rocksdb_range_t range, bool reverse, const rocksdb_read_options_t *options, rocksdb_iterator_cb cb) {
+rocksdb_iterator_refresh(rocksdb_iterator_t *req, rocksdb_range_t range, const rocksdb_iterator_options_t *options, rocksdb_iterator_cb cb) {
   auto db = req->req.db;
 
   if (
@@ -990,7 +996,7 @@ rocksdb_iterator_refresh(rocksdb_iterator_t *req, rocksdb_range_t range, bool re
     return UV_EBUSY;
   }
 
-  req->read_options = options ? *options : rocksdb__default_read_options;
+  req->options = options ? *options : rocksdb__default_iterator_options;
   req->range = range;
   req->cb = cb;
 
