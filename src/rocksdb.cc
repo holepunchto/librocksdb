@@ -56,7 +56,7 @@ rocksdb__from(rocksdb_pinning_tier_t pinning_tier) {
 namespace {
 
 static const rocksdb_options_t rocksdb__default_options = {
-  .version = 1,
+  .version = 2,
   .read_only = false,
   .create_if_missing = false,
   .create_missing_column_families = false,
@@ -64,6 +64,10 @@ static const rocksdb_options_t rocksdb__default_options = {
   .bytes_per_sync = 0,
   .max_open_files = -1,
   .use_direct_reads = false,
+  .avoid_unnecessary_blocking_io = false,
+  .skip_stats_update_on_db_open = false,
+  .paranoid_checks = true,
+  .unordered_write = false,
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
@@ -267,6 +271,22 @@ rocksdb__on_open(uv_work_t *handle) {
 
   options.use_direct_reads = rocksdb__option<&rocksdb_options_t::use_direct_reads, bool>(
     &req->options, 1
+  );
+
+  options.avoid_unnecessary_blocking_io = rocksdb__option<&rocksdb_options_t::avoid_unnecessary_blocking_io, bool>(
+    &req->options, 2
+  );
+
+  options.skip_stats_update_on_db_open = rocksdb__option<&rocksdb_options_t::skip_stats_update_on_db_open, bool>(
+    &req->options, 2
+  );
+
+  options.paranoid_checks = rocksdb__option<&rocksdb_options_t::paranoid_checks, bool>(
+    &req->options, 2
+  );
+
+  options.unordered_write = rocksdb__option<&rocksdb_options_t::unordered_write, bool>(
+    &req->options, 2
   );
 
   auto read_only = rocksdb__option<&rocksdb_options_t::read_only, bool>(

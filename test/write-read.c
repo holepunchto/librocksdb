@@ -84,6 +84,11 @@ main() {
 
   rocksdb_options_t options = {
     .create_if_missing = true,
+    .use_direct_reads = true,
+    .avoid_unnecessary_blocking_io = true,
+    .skip_stats_update_on_db_open = true,
+    .paranoid_checks = false,
+    .unordered_write = true,
   };
 
   rocksdb_column_family_descriptor_t descriptor = rocksdb_column_family_descriptor("default", NULL);

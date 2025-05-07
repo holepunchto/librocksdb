@@ -52,7 +52,7 @@ typedef void (*rocksdb_flush_cb)(rocksdb_flush_t *req, int status);
 typedef void (*rocksdb_compact_range_cb)(rocksdb_compact_range_t *req, int status);
 typedef void (*rocksdb_approximate_size_cb)(rocksdb_approximate_size_t *req, int status);
 
-/** @version 1 */
+/** @version 2 */
 struct rocksdb_options_s {
   int version;
 
@@ -76,6 +76,18 @@ struct rocksdb_options_s {
 
   /** @since 1 */
   bool use_direct_reads;
+
+  /** @since 2 */
+  bool avoid_unnecessary_blocking_io;
+
+  /** @since 2 */
+  bool skip_stats_update_on_db_open;
+
+  /** @since 2 */
+  bool paranoid_checks;
+
+  /** @since 2 */
+  bool unordered_write;
 };
 
 typedef enum {
