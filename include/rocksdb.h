@@ -46,7 +46,7 @@ typedef void (*rocksdb_read_batch_cb)(rocksdb_read_batch_t *batch, int status);
 typedef void (*rocksdb_write_batch_cb)(rocksdb_write_batch_t *batch, int status);
 typedef void (*rocksdb_flush_cb)(rocksdb_flush_t *req, int status);
 
-/** @version 1 */
+/** @version 2 */
 struct rocksdb_options_s {
   int version;
 
@@ -70,6 +70,18 @@ struct rocksdb_options_s {
 
   /** @since 1 */
   bool use_direct_reads;
+
+  /** @since 2 */
+  bool avoid_unnecessary_blocking_io;
+
+  /** @since 2 */
+  bool skip_stats_update_on_db_open;
+
+  /** @since 2 */
+  bool paranoid_checks;
+
+  /** @since 2 */
+  bool unordered_write;
 };
 
 typedef enum {
