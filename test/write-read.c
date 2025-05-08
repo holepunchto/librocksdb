@@ -49,8 +49,14 @@ on_write(rocksdb_write_batch_t *req, int status) {
   read.key = rocksdb_slice_init("hello", 5);
   read.value = rocksdb_slice_empty();
 
+  rocksdb_read_options_t read_options = {
+    .async_io = true,
+    .verify_checksums = false,
+    .fill_cache = false,
+  };
+
   static rocksdb_read_batch_t batch;
-  e = rocksdb_read(&db, &batch, &read, 1, NULL, on_read);
+  e = rocksdb_read(&db, &batch, &read, 1, &read_options, on_read);
   assert(e == 0);
 }
 
