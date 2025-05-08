@@ -199,12 +199,21 @@ struct rocksdb_column_family_options_s {
   bool force_consistency_checks;
 };
 
-/** @version 0 */
+/** @version 1 */
 struct rocksdb_read_options_s {
   int version;
 
   /** @since 0 */
   rocksdb_snapshot_t *snapshot;
+
+  /** @since 1 */
+  bool async_io;
+
+  /** @since 1 */
+  bool verify_checksums;
+
+  /** @since 1 */
+  bool fill_cache;
 };
 
 /** @version 0 */

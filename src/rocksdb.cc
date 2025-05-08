@@ -105,6 +105,9 @@ static const rocksdb_iterator_options_t rocksdb__default_iterator_options = {
 static const rocksdb_read_options_t rocksdb__default_read_options = {
   .version = 0,
   .snapshot = nullptr,
+  .async_io = false,
+  .verify_checksums = true,
+  .fill_cache = true,
 };
 
 static const rocksdb_write_options_t rocksdb__default_write_options = {
@@ -1207,6 +1210,18 @@ rocksdb__on_read(uv_work_t *handle) {
     );
 
     ReadOptions options;
+
+    options.async_io = rocksdb__option<&rocksdb_read_options_t::async_io, bool>(
+      &req->options, 1
+    );
+
+    options.verify_checksums = rocksdb__option<&rocksdb_read_options_t::verify_checksums, bool>(
+      &req->options, 1
+    );
+
+    options.fill_cache = rocksdb__option<&rocksdb_read_options_t::fill_cache, bool>(
+      &req->options, 1
+    );
 
     if (snapshot) options.snapshot = reinterpret_cast<const Snapshot *>(snapshot->handle);
 
