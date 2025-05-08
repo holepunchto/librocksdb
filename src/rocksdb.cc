@@ -24,7 +24,7 @@ static_assert(sizeof(Slice) == sizeof(rocksdb_slice_t));
 namespace {
 
 static const rocksdb_options_t rocksdb__default_options = {
-  .version = 1,
+  .version = 2,
   .read_only = false,
   .create_if_missing = false,
   .create_missing_column_families = false,
@@ -32,10 +32,14 @@ static const rocksdb_options_t rocksdb__default_options = {
   .bytes_per_sync = 0,
   .max_open_files = -1,
   .use_direct_reads = false,
+  .avoid_unnecessary_blocking_io = false,
+  .skip_stats_update_on_db_open = false,
+  .paranoid_checks = true,
+  .unordered_write = false,
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
-  .version = 2,
+  .version = 3,
   .compaction_style = rocksdb_level_compaction,
   .enable_blob_files = false,
   .min_blob_size = 0,
@@ -48,7 +52,12 @@ static const rocksdb_column_family_options_t rocksdb__default_column_family_opti
   .no_block_cache = false,
   .filter_policy = (rocksdb_filter_policy_t) {
     .type = rocksdb_no_filter_policy,
-  }
+  },
+  .optimize_filters_for_hits = false,
+  .num_levels = 7,
+  .max_write_buffer_number = 2,
+  .paranoid_file_checks = false,
+  .force_consistency_checks = true,
 };
 
 static const rocksdb_iterator_options_t rocksdb__default_iterator_options = {
@@ -61,6 +70,9 @@ static const rocksdb_iterator_options_t rocksdb__default_iterator_options = {
 static const rocksdb_read_options_t rocksdb__default_read_options = {
   .version = 0,
   .snapshot = nullptr,
+  .async_io = false,
+  .verify_checksums = true,
+  .fill_cache = true,
 };
 
 static const rocksdb_write_options_t rocksdb__default_write_options = {
@@ -210,6 +222,22 @@ rocksdb__on_open(uv_work_t *handle) {
     &req->options, 1
   );
 
+  options.avoid_unnecessary_blocking_io = rocksdb__option<&rocksdb_options_t::avoid_unnecessary_blocking_io, bool>(
+    &req->options, 2
+  );
+
+  options.skip_stats_update_on_db_open = rocksdb__option<&rocksdb_options_t::skip_stats_update_on_db_open, bool>(
+    &req->options, 2
+  );
+
+  options.paranoid_checks = rocksdb__option<&rocksdb_options_t::paranoid_checks, bool>(
+    &req->options, 2
+  );
+
+  options.unordered_write = rocksdb__option<&rocksdb_options_t::unordered_write, bool>(
+    &req->options, 2
+  );
+
   auto read_only = rocksdb__option<&rocksdb_options_t::read_only, bool>(
     &req->options, 0
   );
@@ -304,6 +332,26 @@ rocksdb__on_open(uv_work_t *handle) {
 
     options.enable_blob_garbage_collection = rocksdb__option<&rocksdb_column_family_options_t::enable_blob_garbage_collection, bool>(
       &column_family.options, 0
+    );
+
+    options.optimize_filters_for_hits = rocksdb__option<&rocksdb_column_family_options_t::optimize_filters_for_hits, bool>(
+      &column_family.options, 3
+    );
+
+    options.num_levels = rocksdb__option<&rocksdb_column_family_options_t::num_levels, int>(
+      &column_family.options, 3
+    );
+
+    options.max_write_buffer_number = rocksdb__option<&rocksdb_column_family_options_t::max_write_buffer_number, int>(
+      &column_family.options, 3
+    );
+
+    options.paranoid_file_checks = rocksdb__option<&rocksdb_column_family_options_t::paranoid_file_checks, bool>(
+      &column_family.options, 3
+    );
+
+    options.force_consistency_checks = rocksdb__option<&rocksdb_column_family_options_t::force_consistency_checks, bool>(
+      &column_family.options, 3
     );
 
     BlockBasedTableOptions table_options;
@@ -1102,6 +1150,18 @@ rocksdb__on_read(uv_work_t *handle) {
     );
 
     ReadOptions options;
+
+    options.async_io = rocksdb__option<&rocksdb_read_options_t::async_io, bool>(
+      &req->options, 1
+    );
+
+    options.verify_checksums = rocksdb__option<&rocksdb_read_options_t::verify_checksums, bool>(
+      &req->options, 1
+    );
+
+    options.fill_cache = rocksdb__option<&rocksdb_read_options_t::fill_cache, bool>(
+      &req->options, 1
+    );
 
     if (snapshot) options.snapshot = reinterpret_cast<const Snapshot *>(snapshot->handle);
 

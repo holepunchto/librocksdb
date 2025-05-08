@@ -46,7 +46,7 @@ typedef void (*rocksdb_read_batch_cb)(rocksdb_read_batch_t *batch, int status);
 typedef void (*rocksdb_write_batch_cb)(rocksdb_write_batch_t *batch, int status);
 typedef void (*rocksdb_flush_cb)(rocksdb_flush_t *req, int status);
 
-/** @version 1 */
+/** @version 2 */
 struct rocksdb_options_s {
   int version;
 
@@ -70,6 +70,18 @@ struct rocksdb_options_s {
 
   /** @since 1 */
   bool use_direct_reads;
+
+  /** @since 2 */
+  bool avoid_unnecessary_blocking_io;
+
+  /** @since 2 */
+  bool skip_stats_update_on_db_open;
+
+  /** @since 2 */
+  bool paranoid_checks;
+
+  /** @since 2 */
+  bool unordered_write;
 };
 
 typedef enum {
@@ -113,7 +125,7 @@ struct rocksdb_filter_policy_s {
   };
 };
 
-/** @version 2 */
+/** @version 3 */
 struct rocksdb_column_family_options_s {
   int version;
 
@@ -149,14 +161,38 @@ struct rocksdb_column_family_options_s {
 
   /** @since 2 */
   rocksdb_filter_policy_t filter_policy;
+
+  /** @since 3 */
+  bool optimize_filters_for_hits;
+
+  /** @since 3 */
+  int num_levels;
+
+  /** @since 3 */
+  int max_write_buffer_number;
+
+  /** @since 3 */
+  bool paranoid_file_checks;
+
+  /** @since 3 */
+  bool force_consistency_checks;
 };
 
-/** @version 0 */
+/** @version 1 */
 struct rocksdb_read_options_s {
   int version;
 
   /** @since 0 */
   rocksdb_snapshot_t *snapshot;
+
+  /** @since 1 */
+  bool async_io;
+
+  /** @since 1 */
+  bool verify_checksums;
+
+  /** @since 1 */
+  bool fill_cache;
 };
 
 /** @version 0 */
