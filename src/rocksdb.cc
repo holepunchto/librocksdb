@@ -23,6 +23,38 @@ static_assert(sizeof(Slice) == sizeof(rocksdb_slice_t));
 
 namespace {
 
+static inline CompactionStyle
+rocksdb__from(rocksdb_compaction_style_t compaction_style) {
+  switch (compaction_style) {
+  case rocksdb_level_compaction:
+    return CompactionStyle::kCompactionStyleLevel;
+  case rocksdb_universal_compaction:
+    return CompactionStyle::kCompactionStyleUniversal;
+  case rocksdb_fifo_compaction:
+    return CompactionStyle::kCompactionStyleFIFO;
+  case rocksdb_no_compaction:
+  default:
+    return CompactionStyle::kCompactionStyleNone;
+  }
+}
+
+static inline PinningTier
+rocksdb__from(rocksdb_pinning_tier_t pinning_tier) {
+  switch (pinning_tier) {
+  case rocksdb_pin_none:
+  default:
+    return PinningTier::kNone;
+  case rocksdb_pin_flushed_and_similar:
+    return PinningTier::kFlushedAndSimilar;
+  case rocksdb_pin_all:
+    return PinningTier::kAll;
+  }
+}
+
+} // namespace
+
+namespace {
+
 static const rocksdb_options_t rocksdb__default_options = {
   .version = 1,
   .read_only = false,
@@ -35,20 +67,23 @@ static const rocksdb_options_t rocksdb__default_options = {
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
-  .version = 2,
+  .version = 3,
   .compaction_style = rocksdb_level_compaction,
   .enable_blob_files = false,
   .min_blob_size = 0,
   .blob_file_size = 1 << 28,
   .enable_blob_garbage_collection = false,
-  .table_block_size = 4 * 1024,
-  .table_cache_index_and_filter_blocks = false,
-  .table_format_version = 6,
+  .block_size = 4 * 1024,
+  .cache_index_and_filter_blocks = false,
+  .format_version = 6,
   .optimize_filters_for_memory = false,
   .no_block_cache = false,
   .filter_policy = (rocksdb_filter_policy_t) {
     .type = rocksdb_no_filter_policy,
-  }
+  },
+  .top_level_index_pinning_tier = rocksdb_pin_none,
+  .partition_pinning_tier = rocksdb_pin_none,
+  .unpartitioned_pinning_tier = rocksdb_pin_none,
 };
 
 static const rocksdb_iterator_options_t rocksdb__default_iterator_options = {
@@ -271,24 +306,7 @@ rocksdb__on_open(uv_work_t *handle) {
       &column_family.options, 0
     );
 
-    switch (compaction_style) {
-    case rocksdb_level_compaction:
-      options.compaction_style = CompactionStyle::kCompactionStyleLevel;
-      break;
-
-    case rocksdb_universal_compaction:
-      options.compaction_style = CompactionStyle::kCompactionStyleUniversal;
-      break;
-
-    case rocksdb_fifo_compaction:
-      options.compaction_style = CompactionStyle::kCompactionStyleFIFO;
-      break;
-
-    case rocksdb_no_compaction:
-    default:
-      options.compaction_style = CompactionStyle::kCompactionStyleNone;
-      break;
-    }
+    options.compaction_style = rocksdb__from(compaction_style);
 
     options.enable_blob_files = rocksdb__option<&rocksdb_column_family_options_t::enable_blob_files, bool>(
       &column_family.options, 0
@@ -308,15 +326,15 @@ rocksdb__on_open(uv_work_t *handle) {
 
     BlockBasedTableOptions table_options;
 
-    table_options.block_size = rocksdb__option<&rocksdb_column_family_options_t::table_block_size, uint64_t>(
+    table_options.block_size = rocksdb__option<&rocksdb_column_family_options_t::block_size, uint64_t>(
       &column_family.options, 0
     );
 
-    table_options.cache_index_and_filter_blocks = rocksdb__option<&rocksdb_column_family_options_t::table_cache_index_and_filter_blocks, bool>(
+    table_options.cache_index_and_filter_blocks = rocksdb__option<&rocksdb_column_family_options_t::cache_index_and_filter_blocks, bool>(
       &column_family.options, 0
     );
 
-    table_options.format_version = rocksdb__option<&rocksdb_column_family_options_t::table_format_version, uint32_t>(
+    table_options.format_version = rocksdb__option<&rocksdb_column_family_options_t::format_version, uint32_t>(
       &column_family.options, 0
     );
 
@@ -350,6 +368,24 @@ rocksdb__on_open(uv_work_t *handle) {
       table_options.filter_policy = nullptr;
       break;
     }
+
+    auto top_level_index_pinning = rocksdb__option<&rocksdb_column_family_options_t::top_level_index_pinning_tier, rocksdb_pinning_tier_t>(
+      &column_family.options, 3
+    );
+
+    auto partition_pinning = rocksdb__option<&rocksdb_column_family_options_t::partition_pinning_tier, rocksdb_pinning_tier_t>(
+      &column_family.options, 3
+    );
+
+    auto unpartitioned_pinning = rocksdb__option<&rocksdb_column_family_options_t::unpartitioned_pinning_tier, rocksdb_pinning_tier_t>(
+      &column_family.options, 3
+    );
+
+    table_options.metadata_cache_options = {
+      .top_level_index_pinning = rocksdb__from(top_level_index_pinning),
+      .partition_pinning = rocksdb__from(partition_pinning),
+      .unpartitioned_pinning = rocksdb__from(unpartitioned_pinning),
+    };
 
     options.table_factory = std::shared_ptr<TableFactory>(NewBlockBasedTableFactory(table_options));
 
