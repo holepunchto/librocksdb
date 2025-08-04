@@ -85,6 +85,12 @@ typedef enum {
   rocksdb_ribbon_filter_policy = 2,
 } rocksdb_filter_policy_type_t;
 
+typedef enum {
+  rocksdb_pin_none = 0,
+  rocksdb_pin_flushed_and_similar = 1,
+  rocksdb_pin_all = 2,
+} rocksdb_pinning_tier_t;
+
 /** @version 0 */
 struct rocksdb_bloom_filter_options_s {
   int version;
@@ -113,7 +119,7 @@ struct rocksdb_filter_policy_s {
   };
 };
 
-/** @version 2 */
+/** @version 3 */
 struct rocksdb_column_family_options_s {
   int version;
 
@@ -133,13 +139,13 @@ struct rocksdb_column_family_options_s {
   bool enable_blob_garbage_collection;
 
   /** @since 0 */
-  uint64_t table_block_size;
+  uint64_t block_size;
 
   /** @since 0 */
-  bool table_cache_index_and_filter_blocks;
+  bool cache_index_and_filter_blocks;
 
   /** @since 0 */
-  uint32_t table_format_version;
+  uint32_t format_version;
 
   /** @since 1 */
   bool optimize_filters_for_memory;
@@ -149,6 +155,15 @@ struct rocksdb_column_family_options_s {
 
   /** @since 2 */
   rocksdb_filter_policy_t filter_policy;
+
+  /** @since 3 */
+  rocksdb_pinning_tier_t top_level_index_pinning_tier;
+
+  /** @since 3 */
+  rocksdb_pinning_tier_t partition_pinning_tier;
+
+  /** @since 3 */
+  rocksdb_pinning_tier_t unpartitioned_pinning_tier;
 };
 
 /** @version 0 */
