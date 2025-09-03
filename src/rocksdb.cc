@@ -106,6 +106,11 @@ static const rocksdb_flush_options_t rocksdb__default_flush_options = {
   .version = 0,
 };
 
+static const rocksdb_compact_range_options_t rocksdb__default_compact_range_options = {
+  .version = 0,
+  .exclusive_manual_compaction = true,
+};
+
 } // namespace
 
 namespace {
@@ -137,6 +142,12 @@ rocksdb__option(const rocksdb_read_options_t *options, int min_version, T fallba
 template <auto rocksdb_write_options_t::*P, typename T>
 static inline T
 rocksdb__option(const rocksdb_write_options_t *options, int min_version, T fallback = T(rocksdb__default_write_options.*P)) {
+  return options->version >= min_version ? T(options->*P) : fallback;
+}
+
+template <auto rocksdb_compact_range_options_t::*P, typename T>
+static inline T
+rocksdb__option(const rocksdb_compact_range_options_t *options, int min_version, T fallback = T(rocksdb__default_compact_range_options.*P)) {
   return options->version >= min_version ? T(options->*P) : fallback;
 }
 
@@ -1356,4 +1367,70 @@ rocksdb_snapshot_create(rocksdb_t *db, rocksdb_snapshot_t *snapshot) {
 extern "C" void
 rocksdb_snapshot_destroy(rocksdb_snapshot_t *snapshot) {
   reinterpret_cast<DB *>(snapshot->db->handle)->ReleaseSnapshot(reinterpret_cast<const Snapshot *>(snapshot->handle));
+}
+
+namespace {
+
+static void
+rocksdb__on_after_compact_range(uv_work_t *handle, int status) {
+  auto req = reinterpret_cast<rocksdb_compact_range_t *>(handle->data);
+
+  rocksdb__remove_req(req);
+
+  auto error = req->error;
+
+  req->cb(req, status);
+
+  if (error) free(error);
+}
+
+static void
+rocksdb__on_compact_range(uv_work_t *handle) {
+  auto req = reinterpret_cast<rocksdb_compact_range_t *>(handle->data);
+
+  auto db = reinterpret_cast<DB *>(req->req.db->handle);
+
+  auto start = rocksdb__slice_cast(req->start);
+  auto end = rocksdb__slice_cast(req->end);
+
+  CompactRangeOptions options;
+
+  options.exclusive_manual_compaction = rocksdb__option<&rocksdb_compact_range_options_t::exclusive_manual_compaction, bool>(
+    &req->options, 0
+  );
+
+  auto status = db->CompactRange(options, &start, &end);
+
+  if (status.ok()) {
+    req->error = nullptr;
+  } else {
+    req->error = strdup(status.getState());
+  }
+}
+
+} // namespace
+
+extern "C" int
+rocksdb_compact_range(rocksdb_t *db, rocksdb_compact_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, const rocksdb_compact_range_options_t *options, rocksdb_compact_range_cb cb) {
+  if (
+    (db->state & rocksdb_suspended) != 0 ||
+    (db->state & rocksdb_suspending) != 0
+  ) {
+    return UV_EBUSY;
+  }
+
+  req->req.db = db;
+  req->req.cancelable = true;
+
+  req->start = start;
+  req->end = end;
+  req->options = options ? *options : rocksdb__default_compact_range_options;
+  req->error = nullptr;
+  req->cb = cb;
+
+  req->req.worker.data = static_cast<void *>(req);
+
+  rocksdb__add_req(req);
+
+  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_compact_range, rocksdb__on_after_compact_range);
 }
