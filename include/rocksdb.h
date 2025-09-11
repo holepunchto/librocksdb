@@ -420,6 +420,8 @@ struct rocksdb_compact_range_s {
   char *error;
 
   rocksdb_compact_range_cb cb;
+
+  void *data;
 };
 
 enum {
