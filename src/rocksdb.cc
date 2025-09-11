@@ -1399,7 +1399,11 @@ rocksdb__on_compact_range(uv_work_t *handle) {
     &req->options, 0
   );
 
-  auto status = db->CompactRange(options, &start, &end);
+  auto status = db->CompactRange(
+    options,
+    start.empty() ? nullptr : &start,
+    end.empty() ? nullptr : &end
+  );
 
   if (status.ok()) {
     req->error = nullptr;
