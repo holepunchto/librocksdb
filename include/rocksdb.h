@@ -412,10 +412,12 @@ struct rocksdb_snapshot_s {
 struct rocksdb_compact_range_s {
   rocksdb_req_t req;
 
+  rocksdb_compact_range_options_t options;
+
+  rocksdb_column_family_t *column_family;
+
   rocksdb_slice_t start;
   rocksdb_slice_t end;
-
-  rocksdb_compact_range_options_t options;
 
   char *error;
 
@@ -503,7 +505,7 @@ void
 rocksdb_snapshot_destroy(rocksdb_snapshot_t *snapshot);
 
 int
-rocksdb_compact_range(rocksdb_t *db, rocksdb_compact_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, const rocksdb_compact_range_options_t *options, rocksdb_compact_range_cb cb);
+rocksdb_compact_range(rocksdb_t *db, rocksdb_compact_range_t *req, rocksdb_column_family_t *column_family, rocksdb_slice_t start, rocksdb_slice_t end, const rocksdb_compact_range_options_t *options, rocksdb_compact_range_cb cb);
 
 #ifdef __cplusplus
 }

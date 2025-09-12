@@ -1390,6 +1390,8 @@ rocksdb__on_compact_range(uv_work_t *handle) {
 
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
+  auto column_family = reinterpret_cast<ColumnFamilyHandle *>(req->column_family);
+
   auto start = rocksdb__slice_cast(req->start);
   auto end = rocksdb__slice_cast(req->end);
 
@@ -1401,6 +1403,7 @@ rocksdb__on_compact_range(uv_work_t *handle) {
 
   auto status = db->CompactRange(
     options,
+    column_family,
     start.empty() ? nullptr : &start,
     end.empty() ? nullptr : &end
   );
@@ -1415,7 +1418,7 @@ rocksdb__on_compact_range(uv_work_t *handle) {
 } // namespace
 
 extern "C" int
-rocksdb_compact_range(rocksdb_t *db, rocksdb_compact_range_t *req, rocksdb_slice_t start, rocksdb_slice_t end, const rocksdb_compact_range_options_t *options, rocksdb_compact_range_cb cb) {
+rocksdb_compact_range(rocksdb_t *db, rocksdb_compact_range_t *req, rocksdb_column_family_t *column_family, rocksdb_slice_t start, rocksdb_slice_t end, const rocksdb_compact_range_options_t *options, rocksdb_compact_range_cb cb) {
   if (
     (db->state & rocksdb_suspended) != 0 ||
     (db->state & rocksdb_suspending) != 0
@@ -1425,7 +1428,7 @@ rocksdb_compact_range(rocksdb_t *db, rocksdb_compact_range_t *req, rocksdb_slice
 
   req->req.db = db;
   req->req.cancelable = true;
-
+  req->column_family = column_family;
   req->start = start;
   req->end = end;
   req->options = options ? *options : rocksdb__default_compact_range_options;

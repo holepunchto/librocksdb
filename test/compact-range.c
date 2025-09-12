@@ -45,7 +45,7 @@ on_write(rocksdb_write_batch_t *req, int status) {
   rocksdb_slice_t start = rocksdb_slice_init("b", 2);
   rocksdb_slice_t end = rocksdb_slice_init("e", 2);
 
-  e = rocksdb_compact_range(&db, &compact_range, start, end, NULL, on_compact_range);
+  e = rocksdb_compact_range(&db, &compact_range, family, start, end, NULL, on_compact_range);
   assert(e == 0);
 }
 
