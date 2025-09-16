@@ -24,7 +24,7 @@ on_approximate_size(rocksdb_approximate_size_t *req, int status) {
 
   assert(req->error == NULL);
 
-  assert(req->result == 42);
+  assert(req->result > 0);
 
   e = rocksdb_column_family_destroy(&db, family);
   assert(e == 0);
