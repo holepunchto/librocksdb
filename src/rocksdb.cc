@@ -1441,3 +1441,79 @@ rocksdb_compact_range(rocksdb_t *db, rocksdb_compact_range_t *req, rocksdb_colum
 
   return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_compact_range, rocksdb__on_after_compact_range);
 }
+
+namespace {
+
+static void
+rocksdb__on_after_approximate_size(uv_work_t *handle, int status) {
+  auto req = reinterpret_cast<rocksdb_approximate_size_t *>(handle->data);
+
+  rocksdb__remove_req(req);
+
+  auto error = req->error;
+
+  req->cb(req, status);
+
+  if (error) free(error);
+}
+
+static void
+rocksdb__on_approximate_size(uv_work_t *handle) {
+  auto req = reinterpret_cast<rocksdb_approximate_size_t *>(handle->data);
+
+  auto db = reinterpret_cast<DB *>(req->req.db->handle);
+
+  auto column_family = reinterpret_cast<ColumnFamilyHandle *>(req->column_family);
+
+  auto start = rocksdb__slice_cast(req->start);
+  auto end = rocksdb__slice_cast(req->end);
+
+  SizeApproximationOptions options;
+
+  options.include_memtables = true;
+  options.files_size_error_margin = 0.1;
+
+  constexpr int SIZE = 1;
+
+  std::array<Range, SIZE> ranges;
+  std::array<uint64_t, SIZE> result;
+
+  ranges[0].start = start;
+  ranges[0].limit = end;
+
+  auto status = db->GetApproximateSizes(options, column_family, ranges.data(), SIZE, result.data());
+
+  if (status.ok()) {
+    req->error = nullptr;
+    req->result = result[0];
+  } else {
+    req->error = strdup(status.getState());
+    req->result = 0;
+  }
+}
+
+} // namespace
+
+extern "C" int
+rocksdb_approximate_size(rocksdb_t *db, rocksdb_approximate_size_t *req, rocksdb_column_family_t *column_family, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_approximate_size_cb cb) {
+  if (
+    (db->state & rocksdb_suspended) != 0 ||
+    (db->state & rocksdb_suspending) != 0
+  ) {
+    return UV_EBUSY;
+  }
+
+  req->req.db = db;
+  req->req.cancelable = true;
+  req->column_family = column_family;
+  req->start = start;
+  req->end = end;
+  req->error = nullptr;
+  req->cb = cb;
+
+  req->req.worker.data = static_cast<void *>(req);
+
+  rocksdb__add_req(req);
+
+  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_approximate_size, rocksdb__on_after_approximate_size);
+}

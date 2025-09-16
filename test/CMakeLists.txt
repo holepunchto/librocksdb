@@ -1,4 +1,5 @@
 list(APPEND tests
+  approximate-size
   compact-range
   create-folders-recursively
   delete-range
