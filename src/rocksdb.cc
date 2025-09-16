@@ -1,6 +1,7 @@
 #include <memory>
 #include <vector>
 
+#include <array>
 #include <intrusive.h>
 #include <intrusive/ring.h>
 #include <path.h>
@@ -1473,7 +1474,7 @@ rocksdb__on_approximate_size(uv_work_t *handle) {
   options.include_memtables = true;
   options.files_size_error_margin = 0.1;
 
-  const std::size_t SIZE = 1;
+  constexpr int SIZE = 1;
 
   std::array<Range, SIZE> ranges;
   std::array<uint64_t, SIZE> result;
