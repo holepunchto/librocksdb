@@ -1,7 +1,6 @@
 #include <memory>
 #include <vector>
 
-#include <array>
 #include <intrusive.h>
 #include <intrusive/ring.h>
 #include <path.h>
@@ -1474,19 +1473,18 @@ rocksdb__on_approximate_size(uv_work_t *handle) {
   options.include_memtables = true;
   options.files_size_error_margin = 0.1;
 
-  constexpr int SIZE = 1;
+  Range range;
 
-  std::array<Range, SIZE> ranges;
-  std::array<uint64_t, SIZE> result;
+  range.start = start;
+  range.limit = end;
 
-  ranges[0].start = start;
-  ranges[0].limit = end;
+  uint64_t result;
 
-  auto status = db->GetApproximateSizes(options, column_family, ranges.data(), SIZE, result.data());
+  auto status = db->GetApproximateSizes(options, column_family, &range, 1, &result);
 
   if (status.ok()) {
     req->error = nullptr;
-    req->result = result[0];
+    req->result = result;
   } else {
     req->error = strdup(status.getState());
     req->result = 0;
