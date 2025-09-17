@@ -20,6 +20,7 @@ typedef struct rocksdb_write_options_s rocksdb_write_options_t;
 typedef struct rocksdb_iterator_options_s rocksdb_iterator_options_t;
 typedef struct rocksdb_flush_options_s rocksdb_flush_options_t;
 typedef struct rocksdb_compact_range_options_s rocksdb_compact_range_options_t;
+typedef struct rocksdb_approximate_size_options_s rocksdb_approximate_size_options_t;
 typedef struct rocksdb_column_family_s rocksdb_column_family_t;
 typedef struct rocksdb_column_family_descriptor_s rocksdb_column_family_descriptor_t;
 typedef struct rocksdb_req_s rocksdb_req_t;
@@ -209,6 +210,17 @@ struct rocksdb_compact_range_options_s {
 
   /** @since 0 */
   bool exclusive_manual_compaction;
+};
+
+/** @version 0 */
+struct rocksdb_approximate_size_options_s {
+  int version;
+
+  /** @since 0 */
+  bool include_files;
+
+  /** @since 0 */
+  double files_size_error_margin;
 };
 
 struct rocksdb_column_family_s; // Opaque
@@ -431,6 +443,8 @@ struct rocksdb_compact_range_s {
 struct rocksdb_approximate_size_s {
   rocksdb_req_t req;
 
+  rocksdb_approximate_size_options_t options;
+
   rocksdb_column_family_t *column_family;
 
   rocksdb_slice_t start;
@@ -527,7 +541,7 @@ int
 rocksdb_compact_range(rocksdb_t *db, rocksdb_compact_range_t *req, rocksdb_column_family_t *column_family, rocksdb_slice_t start, rocksdb_slice_t end, const rocksdb_compact_range_options_t *options, rocksdb_compact_range_cb cb);
 
 int
-rocksdb_approximate_size(rocksdb_t *db, rocksdb_approximate_size_t *req, rocksdb_column_family_t *column_family, rocksdb_slice_t start, rocksdb_slice_t end, rocksdb_approximate_size_cb cb);
+rocksdb_approximate_size(rocksdb_t *db, rocksdb_approximate_size_t *req, rocksdb_column_family_t *column_family, rocksdb_slice_t start, rocksdb_slice_t end, const rocksdb_approximate_size_options_t *options, rocksdb_approximate_size_cb cb);
 
 #ifdef __cplusplus
 }
