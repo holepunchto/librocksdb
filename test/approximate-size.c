@@ -47,7 +47,11 @@ on_write(rocksdb_write_batch_t *req, int status) {
   rocksdb_slice_t start = rocksdb_slice_init("b", 2);
   rocksdb_slice_t end = rocksdb_slice_init("e", 2);
 
-  e = rocksdb_approximate_size(&db, &approximate_size, family, start, end, NULL, on_approximate_size);
+  rocksdb_approximate_size_options_t options = {
+    .include_files = false,
+  };
+
+  e = rocksdb_approximate_size(&db, &approximate_size, family, start, end, &options, on_approximate_size);
   assert(e == 0);
 }
 

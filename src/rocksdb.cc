@@ -1490,6 +1490,8 @@ rocksdb__on_approximate_size(uv_work_t *handle) {
     &req->options, 0
   );
 
+  options.include_memtables = !options.include_files;
+
   Range range;
 
   range.start = start;
