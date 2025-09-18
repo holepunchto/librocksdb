@@ -217,6 +217,9 @@ struct rocksdb_approximate_size_options_s {
   int version;
 
   /** @since 0 */
+  bool include_memtables;
+
+  /** @since 0 */
   bool include_files;
 
   /** @since 0 */

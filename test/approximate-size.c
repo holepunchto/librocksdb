@@ -48,7 +48,8 @@ on_write(rocksdb_write_batch_t *req, int status) {
   rocksdb_slice_t end = rocksdb_slice_init("e", 2);
 
   rocksdb_approximate_size_options_t options = {
-    .include_files = false,
+    .include_memtables = true,
+    .include_files = true,
   };
 
   e = rocksdb_approximate_size(&db, &approximate_size, family, start, end, &options, on_approximate_size);

@@ -113,6 +113,7 @@ static const rocksdb_compact_range_options_t rocksdb__default_compact_range_opti
 
 static const rocksdb_approximate_size_options_t rocksdb__default_approximate_size_options = {
   .version = 0,
+  .include_memtables = false,
   .include_files = true,
   .files_size_error_margin = -1.0,
 };
@@ -1482,6 +1483,10 @@ rocksdb__on_approximate_size(uv_work_t *handle) {
 
   SizeApproximationOptions options;
 
+  options.include_memtables = rocksdb__option<&rocksdb_approximate_size_options_t::include_memtables, bool>(
+    &req->options, 0
+  );
+
   options.include_files = rocksdb__option<&rocksdb_approximate_size_options_t::include_files, bool>(
     &req->options, 0
   );
@@ -1489,8 +1494,6 @@ rocksdb__on_approximate_size(uv_work_t *handle) {
   options.files_size_error_margin = rocksdb__option<&rocksdb_approximate_size_options_t::files_size_error_margin, double>(
     &req->options, 0
   );
-
-  options.include_memtables = !options.include_files;
 
   Range range;
 
