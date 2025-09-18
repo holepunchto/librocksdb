@@ -111,6 +111,13 @@ static const rocksdb_compact_range_options_t rocksdb__default_compact_range_opti
   .exclusive_manual_compaction = true,
 };
 
+static const rocksdb_approximate_size_options_t rocksdb__default_approximate_size_options = {
+  .version = 0,
+  .include_memtables = false,
+  .include_files = true,
+  .files_size_error_margin = -1.0,
+};
+
 } // namespace
 
 namespace {
@@ -148,6 +155,12 @@ rocksdb__option(const rocksdb_write_options_t *options, int min_version, T fallb
 template <auto rocksdb_compact_range_options_t::*P, typename T>
 static inline T
 rocksdb__option(const rocksdb_compact_range_options_t *options, int min_version, T fallback = T(rocksdb__default_compact_range_options.*P)) {
+  return options->version >= min_version ? T(options->*P) : fallback;
+}
+
+template <auto rocksdb_approximate_size_options_t::*P, typename T>
+static inline T
+rocksdb__option(const rocksdb_approximate_size_options_t *options, int min_version, T fallback = T(rocksdb__default_approximate_size_options.*P)) {
   return options->version >= min_version ? T(options->*P) : fallback;
 }
 
@@ -1440,4 +1453,89 @@ rocksdb_compact_range(rocksdb_t *db, rocksdb_compact_range_t *req, rocksdb_colum
   rocksdb__add_req(req);
 
   return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_compact_range, rocksdb__on_after_compact_range);
+}
+
+namespace {
+
+static void
+rocksdb__on_after_approximate_size(uv_work_t *handle, int status) {
+  auto req = reinterpret_cast<rocksdb_approximate_size_t *>(handle->data);
+
+  rocksdb__remove_req(req);
+
+  auto error = req->error;
+
+  req->cb(req, status);
+
+  if (error) free(error);
+}
+
+static void
+rocksdb__on_approximate_size(uv_work_t *handle) {
+  auto req = reinterpret_cast<rocksdb_approximate_size_t *>(handle->data);
+
+  auto db = reinterpret_cast<DB *>(req->req.db->handle);
+
+  auto column_family = reinterpret_cast<ColumnFamilyHandle *>(req->column_family);
+
+  auto start = rocksdb__slice_cast(req->start);
+  auto end = rocksdb__slice_cast(req->end);
+
+  SizeApproximationOptions options;
+
+  options.include_memtables = rocksdb__option<&rocksdb_approximate_size_options_t::include_memtables, bool>(
+    &req->options, 0
+  );
+
+  options.include_files = rocksdb__option<&rocksdb_approximate_size_options_t::include_files, bool>(
+    &req->options, 0
+  );
+
+  options.files_size_error_margin = rocksdb__option<&rocksdb_approximate_size_options_t::files_size_error_margin, double>(
+    &req->options, 0
+  );
+
+  Range range;
+
+  range.start = start;
+  range.limit = end;
+
+  uint64_t result;
+
+  auto status = db->GetApproximateSizes(options, column_family, &range, 1, &result);
+
+  if (status.ok()) {
+    req->error = nullptr;
+    req->result = result;
+  } else {
+    req->error = strdup(status.getState());
+    req->result = 0;
+  }
+}
+
+} // namespace
+
+extern "C" int
+rocksdb_approximate_size(rocksdb_t *db, rocksdb_approximate_size_t *req, rocksdb_column_family_t *column_family, rocksdb_slice_t start, rocksdb_slice_t end, const rocksdb_approximate_size_options_t *options, rocksdb_approximate_size_cb cb) {
+  if (
+    (db->state & rocksdb_suspended) != 0 ||
+    (db->state & rocksdb_suspending) != 0
+  ) {
+    return UV_EBUSY;
+  }
+
+  req->req.db = db;
+  req->req.cancelable = true;
+  req->column_family = column_family;
+  req->start = start;
+  req->end = end;
+  req->options = options ? *options : rocksdb__default_approximate_size_options;
+  req->error = nullptr;
+  req->cb = cb;
+
+  req->req.worker.data = static_cast<void *>(req);
+
+  rocksdb__add_req(req);
+
+  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_approximate_size, rocksdb__on_after_approximate_size);
 }
