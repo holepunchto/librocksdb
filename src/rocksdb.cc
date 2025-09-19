@@ -66,8 +66,6 @@ static const rocksdb_options_t rocksdb__default_options = {
   .use_direct_reads = false,
   .avoid_unnecessary_blocking_io = false,
   .skip_stats_update_on_db_open = false,
-  .paranoid_checks = true,
-  .unordered_write = false,
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
@@ -91,8 +89,6 @@ static const rocksdb_column_family_options_t rocksdb__default_column_family_opti
   .optimize_filters_for_hits = false,
   .num_levels = 7,
   .max_write_buffer_number = 2,
-  .paranoid_file_checks = false,
-  .force_consistency_checks = true,
 };
 
 static const rocksdb_iterator_options_t rocksdb__default_iterator_options = {
@@ -106,7 +102,6 @@ static const rocksdb_read_options_t rocksdb__default_read_options = {
   .version = 0,
   .snapshot = nullptr,
   .async_io = false,
-  .verify_checksums = true,
   .fill_cache = true,
 };
 
@@ -286,14 +281,6 @@ rocksdb__on_open(uv_work_t *handle) {
   );
 
   options.skip_stats_update_on_db_open = rocksdb__option<&rocksdb_options_t::skip_stats_update_on_db_open, bool>(
-    &req->options, 2
-  );
-
-  options.paranoid_checks = rocksdb__option<&rocksdb_options_t::paranoid_checks, bool>(
-    &req->options, 2
-  );
-
-  options.unordered_write = rocksdb__option<&rocksdb_options_t::unordered_write, bool>(
     &req->options, 2
   );
 
@@ -1212,10 +1199,6 @@ rocksdb__on_read(uv_work_t *handle) {
     ReadOptions options;
 
     options.async_io = rocksdb__option<&rocksdb_read_options_t::async_io, bool>(
-      &req->options, 1
-    );
-
-    options.verify_checksums = rocksdb__option<&rocksdb_read_options_t::verify_checksums, bool>(
       &req->options, 1
     );
 

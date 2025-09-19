@@ -82,12 +82,6 @@ struct rocksdb_options_s {
 
   /** @since 2 */
   bool skip_stats_update_on_db_open;
-
-  /** @since 2 */
-  bool paranoid_checks;
-
-  /** @since 2 */
-  bool unordered_write;
 };
 
 typedef enum {
@@ -191,12 +185,6 @@ struct rocksdb_column_family_options_s {
 
   /** @since 4 */
   int max_write_buffer_number;
-
-  /** @since 4 */
-  bool paranoid_file_checks;
-
-  /** @since 4 */
-  bool force_consistency_checks;
 };
 
 /** @version 1 */
@@ -208,9 +196,6 @@ struct rocksdb_read_options_s {
 
   /** @since 1 */
   bool async_io;
-
-  /** @since 1 */
-  bool verify_checksums;
 
   /** @since 1 */
   bool fill_cache;

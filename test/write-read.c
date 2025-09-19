@@ -51,7 +51,6 @@ on_write(rocksdb_write_batch_t *req, int status) {
 
   rocksdb_read_options_t read_options = {
     .async_io = true,
-    .verify_checksums = false,
     .fill_cache = false,
   };
 
@@ -93,8 +92,6 @@ main() {
     .use_direct_reads = true,
     .avoid_unnecessary_blocking_io = true,
     .skip_stats_update_on_db_open = true,
-    .paranoid_checks = false,
-    .unordered_write = true,
   };
 
   rocksdb_column_family_options_t column_family_options = {
@@ -102,8 +99,6 @@ main() {
     .optimize_filters_for_hits = true,
     .num_levels = 5,
     .max_write_buffer_number = 1,
-    .paranoid_file_checks = true,
-    .force_consistency_checks = false,
   };
 
   rocksdb_column_family_descriptor_t descriptor = rocksdb_column_family_descriptor("default", &column_family_options);
