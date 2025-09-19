@@ -82,6 +82,12 @@ struct rocksdb_options_s {
 
   /** @since 2 */
   bool skip_stats_update_on_db_open;
+
+  /** @since 2 */
+  bool use_direct_io_for_flush_and_compaction;
+
+  /** @since 2 */
+  int max_file_opening_threads;
 };
 
 typedef enum {

@@ -66,6 +66,8 @@ static const rocksdb_options_t rocksdb__default_options = {
   .use_direct_reads = false,
   .avoid_unnecessary_blocking_io = false,
   .skip_stats_update_on_db_open = false,
+  .use_direct_io_for_flush_and_compaction = false,
+  .max_file_opening_threads = 16,
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
@@ -284,6 +286,14 @@ rocksdb__on_open(uv_work_t *handle) {
     &req->options, 2
   );
 
+  options.use_direct_io_for_flush_and_compaction = rocksdb__option<&rocksdb_options_t::use_direct_io_for_flush_and_compaction, bool>(
+    &req->options, 2
+  );
+
+  options.max_file_opening_threads = rocksdb__option<&rocksdb_options_t::max_file_opening_threads, bool>(
+    &req->options, 2
+  );
+
   auto read_only = rocksdb__option<&rocksdb_options_t::read_only, bool>(
     &req->options, 0
   );
@@ -435,14 +445,6 @@ rocksdb__on_open(uv_work_t *handle) {
     );
 
     options.max_write_buffer_number = rocksdb__option<&rocksdb_column_family_options_t::max_write_buffer_number, int>(
-      &column_family.options, 4
-    );
-
-    options.paranoid_file_checks = rocksdb__option<&rocksdb_column_family_options_t::paranoid_file_checks, bool>(
-      &column_family.options, 4
-    );
-
-    options.force_consistency_checks = rocksdb__option<&rocksdb_column_family_options_t::force_consistency_checks, bool>(
       &column_family.options, 4
     );
 

@@ -92,6 +92,8 @@ main() {
     .use_direct_reads = true,
     .avoid_unnecessary_blocking_io = true,
     .skip_stats_update_on_db_open = true,
+    .use_direct_io_for_flush_and_compaction = true,
+    .max_file_opening_threads = -1,
   };
 
   rocksdb_column_family_options_t column_family_options = {
