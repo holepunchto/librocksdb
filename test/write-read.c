@@ -91,7 +91,16 @@ main() {
     .unordered_write = true,
   };
 
-  rocksdb_column_family_descriptor_t descriptor = rocksdb_column_family_descriptor("default", NULL);
+  rocksdb_column_family_options_t column_family_options = {
+    .optimize_filters_for_memory = true,
+    .optimize_filters_for_hits = true,
+    .num_levels = 5,
+    .max_write_buffer_number = 1,
+    .paranoid_file_checks = true,
+    .force_consistency_checks = false,
+  };
+
+  rocksdb_column_family_descriptor_t descriptor = rocksdb_column_family_descriptor("default", &column_family_options);
 
   static rocksdb_open_t open;
   e = rocksdb_open(&db, &open, "test/fixtures/write-read.db", &options, &descriptor, &family, 1, on_open);

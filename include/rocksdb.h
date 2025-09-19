@@ -182,6 +182,21 @@ struct rocksdb_column_family_options_s {
 
   /** @since 3 */
   rocksdb_pinning_tier_t unpartitioned_pinning_tier;
+
+  /** @since 4 */
+  bool optimize_filters_for_hits;
+
+  /** @since 4 */
+  int num_levels;
+
+  /** @since 4 */
+  int max_write_buffer_number;
+
+  /** @since 4 */
+  bool paranoid_file_checks;
+
+  /** @since 4 */
+  bool force_consistency_checks;
 };
 
 /** @version 0 */

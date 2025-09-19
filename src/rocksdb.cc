@@ -88,6 +88,11 @@ static const rocksdb_column_family_options_t rocksdb__default_column_family_opti
   .top_level_index_pinning_tier = rocksdb_pin_none,
   .partition_pinning_tier = rocksdb_pin_none,
   .unpartitioned_pinning_tier = rocksdb_pin_none,
+  .optimize_filters_for_hits = false,
+  .num_levels = 7,
+  .max_write_buffer_number = 2,
+  .paranoid_file_checks = false,
+  .force_consistency_checks = true,
 };
 
 static const rocksdb_iterator_options_t rocksdb__default_iterator_options = {
@@ -430,6 +435,26 @@ rocksdb__on_open(uv_work_t *handle) {
       .partition_pinning = rocksdb__from(partition_pinning),
       .unpartitioned_pinning = rocksdb__from(unpartitioned_pinning),
     };
+
+    options.optimize_filters_for_hits = rocksdb__option<&rocksdb_column_family_options_t::optimize_filters_for_hits, bool>(
+      &column_family.options, 4
+    );
+
+    options.num_levels = rocksdb__option<&rocksdb_column_family_options_t::num_levels, int>(
+      &column_family.options, 4
+    );
+
+    options.max_write_buffer_number = rocksdb__option<&rocksdb_column_family_options_t::max_write_buffer_number, int>(
+      &column_family.options, 4
+    );
+
+    options.paranoid_file_checks = rocksdb__option<&rocksdb_column_family_options_t::paranoid_file_checks, bool>(
+      &column_family.options, 4
+    );
+
+    options.force_consistency_checks = rocksdb__option<&rocksdb_column_family_options_t::force_consistency_checks, bool>(
+      &column_family.options, 4
+    );
 
     options.table_factory = std::shared_ptr<TableFactory>(NewBlockBasedTableFactory(table_options));
 
