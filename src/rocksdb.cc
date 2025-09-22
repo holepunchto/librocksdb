@@ -56,7 +56,7 @@ rocksdb__from(rocksdb_pinning_tier_t pinning_tier) {
 namespace {
 
 static const rocksdb_options_t rocksdb__default_options = {
-  .version = 1,
+  .version = 2,
   .read_only = false,
   .create_if_missing = false,
   .create_missing_column_families = false,
@@ -64,6 +64,10 @@ static const rocksdb_options_t rocksdb__default_options = {
   .bytes_per_sync = 0,
   .max_open_files = -1,
   .use_direct_reads = false,
+  .avoid_unnecessary_blocking_io = false,
+  .skip_stats_update_on_db_open = false,
+  .use_direct_io_for_flush_and_compaction = false,
+  .max_file_opening_threads = 16,
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
@@ -84,6 +88,9 @@ static const rocksdb_column_family_options_t rocksdb__default_column_family_opti
   .top_level_index_pinning_tier = rocksdb_pin_none,
   .partition_pinning_tier = rocksdb_pin_none,
   .unpartitioned_pinning_tier = rocksdb_pin_none,
+  .optimize_filters_for_hits = false,
+  .num_levels = 7,
+  .max_write_buffer_number = 2,
 };
 
 static const rocksdb_iterator_options_t rocksdb__default_iterator_options = {
@@ -96,6 +103,8 @@ static const rocksdb_iterator_options_t rocksdb__default_iterator_options = {
 static const rocksdb_read_options_t rocksdb__default_read_options = {
   .version = 0,
   .snapshot = nullptr,
+  .async_io = false,
+  .fill_cache = true,
 };
 
 static const rocksdb_write_options_t rocksdb__default_write_options = {
@@ -269,6 +278,22 @@ rocksdb__on_open(uv_work_t *handle) {
     &req->options, 1
   );
 
+  options.avoid_unnecessary_blocking_io = rocksdb__option<&rocksdb_options_t::avoid_unnecessary_blocking_io, bool>(
+    &req->options, 2
+  );
+
+  options.skip_stats_update_on_db_open = rocksdb__option<&rocksdb_options_t::skip_stats_update_on_db_open, bool>(
+    &req->options, 2
+  );
+
+  options.use_direct_io_for_flush_and_compaction = rocksdb__option<&rocksdb_options_t::use_direct_io_for_flush_and_compaction, bool>(
+    &req->options, 2
+  );
+
+  options.max_file_opening_threads = rocksdb__option<&rocksdb_options_t::max_file_opening_threads, bool>(
+    &req->options, 2
+  );
+
   auto read_only = rocksdb__option<&rocksdb_options_t::read_only, bool>(
     &req->options, 0
   );
@@ -410,6 +435,18 @@ rocksdb__on_open(uv_work_t *handle) {
       .partition_pinning = rocksdb__from(partition_pinning),
       .unpartitioned_pinning = rocksdb__from(unpartitioned_pinning),
     };
+
+    options.optimize_filters_for_hits = rocksdb__option<&rocksdb_column_family_options_t::optimize_filters_for_hits, bool>(
+      &column_family.options, 4
+    );
+
+    options.num_levels = rocksdb__option<&rocksdb_column_family_options_t::num_levels, int>(
+      &column_family.options, 4
+    );
+
+    options.max_write_buffer_number = rocksdb__option<&rocksdb_column_family_options_t::max_write_buffer_number, int>(
+      &column_family.options, 4
+    );
 
     options.table_factory = std::shared_ptr<TableFactory>(NewBlockBasedTableFactory(table_options));
 
@@ -1162,6 +1199,14 @@ rocksdb__on_read(uv_work_t *handle) {
     );
 
     ReadOptions options;
+
+    options.async_io = rocksdb__option<&rocksdb_read_options_t::async_io, bool>(
+      &req->options, 1
+    );
+
+    options.fill_cache = rocksdb__option<&rocksdb_read_options_t::fill_cache, bool>(
+      &req->options, 1
+    );
 
     if (snapshot) options.snapshot = reinterpret_cast<const Snapshot *>(snapshot->handle);
 

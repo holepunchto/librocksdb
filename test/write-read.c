@@ -49,8 +49,13 @@ on_write(rocksdb_write_batch_t *req, int status) {
   read.key = rocksdb_slice_init("hello", 5);
   read.value = rocksdb_slice_empty();
 
+  rocksdb_read_options_t read_options = {
+    .async_io = true,
+    .fill_cache = false,
+  };
+
   static rocksdb_read_batch_t batch;
-  e = rocksdb_read(&db, &batch, &read, 1, NULL, on_read);
+  e = rocksdb_read(&db, &batch, &read, 1, &read_options, on_read);
   assert(e == 0);
 }
 
@@ -84,9 +89,21 @@ main() {
 
   rocksdb_options_t options = {
     .create_if_missing = true,
+    .use_direct_reads = true,
+    .avoid_unnecessary_blocking_io = true,
+    .skip_stats_update_on_db_open = true,
+    .use_direct_io_for_flush_and_compaction = true,
+    .max_file_opening_threads = -1,
   };
 
-  rocksdb_column_family_descriptor_t descriptor = rocksdb_column_family_descriptor("default", NULL);
+  rocksdb_column_family_options_t column_family_options = {
+    .optimize_filters_for_memory = true,
+    .optimize_filters_for_hits = true,
+    .num_levels = 5,
+    .max_write_buffer_number = 1,
+  };
+
+  rocksdb_column_family_descriptor_t descriptor = rocksdb_column_family_descriptor("default", &column_family_options);
 
   static rocksdb_open_t open;
   e = rocksdb_open(&db, &open, "test/fixtures/write-read.db", &options, &descriptor, &family, 1, on_open);
