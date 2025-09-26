@@ -12,6 +12,7 @@ main() {
   Status status;
 
   Options options;
+
   options.create_if_missing = true;
 
   std::unique_ptr<DB> db;
@@ -68,6 +69,10 @@ main() {
     ReadOptions options;
 
     db->MultiGet(options, 1, column_families.data(), keys.data(), values.data(), statuses.data());
+
+    for (auto status : statuses) {
+      assert(status.ok());
+    }
   }
 
   elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();

@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 #include <uv.h>
 
@@ -24,53 +25,22 @@ on_close(rocksdb_close_t *req, int status) {
 }
 
 static void
-loop_read(void);
-
-static void
 on_read(rocksdb_read_batch_t *req, int status) {
   int e;
 
   assert(status == 0);
 
-  if (reading < ops) loop_read();
-  else {
-    int64_t elapsed = uv_hrtime() - start;
+  int64_t elapsed = uv_hrtime() - start;
 
-    printf("%f reads/s\n", ops / (elapsed / 1e9));
+  printf("%f reads/s\n", ops / (elapsed / 1e9));
 
-    e = rocksdb_column_family_destroy(&db, family);
-    assert(e == 0);
+  e = rocksdb_column_family_destroy(&db, family);
+  assert(e == 0);
 
-    static rocksdb_close_t close;
-    e = rocksdb_close(&db, &close, on_close);
-    assert(e == 0);
-  }
-}
-
-static void
-loop_read(void) {
-  int e;
-
-  union {
-    char buffer[4];
-    uint32_t uint;
-  } key;
-
-  key.uint = ++reading;
-
-  static rocksdb_read_t read;
-  read.type = rocksdb_get;
-  read.column_family = family;
-  read.key = rocksdb_slice_init(key.buffer, sizeof(key));
-  read.value = rocksdb_slice_empty();
-
-  static rocksdb_read_batch_t batch;
-  e = rocksdb_read(&db, &batch, &read, 1, NULL, on_read);
+  static rocksdb_close_t close;
+  e = rocksdb_close(&db, &close, on_close);
   assert(e == 0);
 }
-
-static void
-loop_write(void);
 
 static void
 on_write(rocksdb_write_batch_t *req, int status) {
@@ -78,39 +48,36 @@ on_write(rocksdb_write_batch_t *req, int status) {
 
   assert(status == 0);
 
-  if (writing < ops) loop_write();
-  else {
-    int64_t elapsed = uv_hrtime() - start;
+  int64_t elapsed = uv_hrtime() - start;
 
-    printf("%f writes/s\n", ops / (elapsed / 1e9));
+  printf("%f writes/s\n", ops / (elapsed / 1e9));
 
-    start = uv_hrtime();
-
-    loop_read();
-  }
-}
-
-static void
-loop_write(void) {
-  int e;
+  static rocksdb_read_t reads[100000];
 
   union {
     char buffer[4];
     uint32_t uint;
   } key;
 
-  key.uint = ++writing;
+  for (int i = 0; i < 100000; i++) {
+    rocksdb_read_t *read = &reads[i];
 
-  static char value[512] = {0};
+    key.uint = i + 1;
 
-  static rocksdb_write_t write;
-  write.type = rocksdb_put;
-  write.column_family = family;
-  write.key = rocksdb_slice_init(key.buffer, sizeof(key));
-  write.value = rocksdb_slice_init(value, sizeof(value));
+    char *buffer = malloc(sizeof(key));
 
-  static rocksdb_write_batch_t batch;
-  e = rocksdb_write(&db, &batch, &write, 1, NULL, on_write);
+    memcpy(buffer, key.buffer, sizeof(key));
+
+    read->type = rocksdb_get;
+    read->column_family = family;
+    read->key = rocksdb_slice_init(buffer, sizeof(key));
+    read->value = rocksdb_slice_empty();
+  }
+
+  start = uv_hrtime();
+
+  static rocksdb_read_batch_t batch;
+  e = rocksdb_read(&db, &batch, reads, 100000, NULL, on_read);
   assert(e == 0);
 }
 
@@ -122,9 +89,35 @@ on_open(rocksdb_open_t *req, int status) {
 
   assert(req->error == NULL);
 
+  static rocksdb_write_t writes[100000];
+
+  union {
+    char buffer[4];
+    uint32_t uint;
+  } key;
+
+  static char value[512] = {0};
+
+  for (int i = 0; i < 100000; i++) {
+    rocksdb_write_t *write = &writes[i];
+
+    key.uint = i + 1;
+
+    char *buffer = malloc(sizeof(key));
+
+    memcpy(buffer, key.buffer, sizeof(key));
+
+    write->type = rocksdb_put;
+    write->column_family = family;
+    write->key = rocksdb_slice_init(buffer, sizeof(key));
+    write->value = rocksdb_slice_init(value, sizeof(value));
+  }
+
   start = uv_hrtime();
 
-  loop_write();
+  static rocksdb_write_batch_t batch;
+  e = rocksdb_write(&db, &batch, writes, 100000, NULL, on_write);
+  assert(e == 0);
 }
 
 int
