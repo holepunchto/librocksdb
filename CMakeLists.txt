@@ -135,5 +135,6 @@ install(FILES include/rocksdb.h DESTINATION include)
 if(PROJECT_IS_TOP_LEVEL)
   enable_testing()
 
+  add_subdirectory(bench)
   add_subdirectory(test)
 endif()
