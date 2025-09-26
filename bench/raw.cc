@@ -19,60 +19,62 @@ main() {
   status = DB::Open(options, "bench/raw.db", &db);
   assert(status.ok());
 
-  auto start = std::chrono::steady_clock::now();
+  WriteBatch batch;
+
+  union {
+    char buffer[4];
+    uint32_t uint;
+  } key;
+
+  static char value[512] = {0};
 
   for (int i = 0; i < ops; i++) {
-    WriteBatch batch;
-    WriteOptions options;
-
-    union {
-      char buffer[4];
-      uint32_t uint;
-    } key;
-
     key.uint = i + 1;
 
-    static char value[512] = {0};
+    char *buffer = new char[4];
 
-    batch.Put(Slice(key.buffer, sizeof(key)), Slice(value, sizeof(value)));
+    std::copy(key.buffer, key.buffer + 4, buffer);
 
-    status = db->Write(options, &batch);
-    assert(status.ok());
+    batch.Put(Slice(buffer, sizeof(key)), Slice(value, sizeof(value)));
   }
+
+  auto start = std::chrono::steady_clock::now();
+
+  WriteOptions write_options;
+  status = db->Write(write_options, &batch);
+  assert(status.ok());
 
   auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
 
   printf("%f writes/s\n", ops / (elapsed / 1e9));
 
-  start = std::chrono::steady_clock::now();
+  auto column_families = std::vector<ColumnFamilyHandle *>(ops);
+
+  auto keys = std::vector<Slice>(ops);
+
+  auto values = std::vector<PinnableSlice>(ops);
+
+  auto statuses = std::vector<Status>(ops);
 
   for (int i = 0; i < ops; i++) {
-    auto column_families = std::vector<ColumnFamilyHandle *>(1);
-
-    column_families[0] = db->DefaultColumnFamily();
-
-    union {
-      char buffer[4];
-      uint32_t uint;
-    } key;
+    column_families[i] = db->DefaultColumnFamily();
 
     key.uint = i + 1;
 
-    auto keys = std::vector<Slice>(1);
+    char *buffer = new char[4];
 
-    keys[0] = Slice(key.buffer, sizeof(key));
+    std::copy(key.buffer, key.buffer + 4, buffer);
 
-    auto values = std::vector<PinnableSlice>(1);
+    keys[0] = Slice(buffer, sizeof(key));
+  }
 
-    auto statuses = std::vector<Status>(1);
+  start = std::chrono::steady_clock::now();
 
-    ReadOptions options;
+  ReadOptions read_options;
+  db->MultiGet(read_options, ops, column_families.data(), keys.data(), values.data(), statuses.data());
 
-    db->MultiGet(options, 1, column_families.data(), keys.data(), values.data(), statuses.data());
-
-    for (auto status : statuses) {
-      assert(status.ok());
-    }
+  for (auto status : statuses) {
+    assert(status.ok());
   }
 
   elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
