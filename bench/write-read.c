@@ -101,7 +101,7 @@ loop_write(void) {
 
   key.uint = ++writing;
 
-  static char value[512];
+  static char value[512] = {0};
 
   static rocksdb_write_t write;
   write.type = rocksdb_put;
