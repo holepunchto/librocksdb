@@ -18,3 +18,12 @@ foreach(bench IN LISTS benches)
   )
 endforeach()
 
+
+add_executable(raw raw.cc)
+
+target_link_libraries(
+  raw
+  PRIVATE
+    rocksdb_static
+    rocksdb_facebook
+)
