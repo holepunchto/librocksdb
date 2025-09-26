@@ -9,7 +9,6 @@
 #include <rocksdb/db.h>
 #include <rocksdb/filter_policy.h>
 #include <rocksdb/options.h>
-#include <rocksdb/statistics.h>
 #include <rocksdb/table.h>
 #include <stdlib.h>
 #include <string.h>
@@ -247,8 +246,6 @@ rocksdb__on_after_open(uv_work_t *handle, int status) {
   if (error) free(error);
 }
 
-static std::shared_ptr<Statistics> statistics;
-
 static void
 rocksdb__on_open(uv_work_t *handle) {
   int err;
@@ -256,8 +253,6 @@ rocksdb__on_open(uv_work_t *handle) {
   auto req = reinterpret_cast<rocksdb_open_t *>(handle->data);
 
   DBOptions options;
-
-  options.statistics = statistics = CreateDBStatistics();
 
   options.create_if_missing = rocksdb__option<&rocksdb_options_t::create_if_missing, bool>(
     &req->options, 0
@@ -535,8 +530,6 @@ rocksdb__on_close(uv_work_t *handle) {
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
   CancelAllBackgroundWork(db, true);
-
-  printf("%s\n", statistics->ToString().c_str());
 
   auto status = db->Close();
 
