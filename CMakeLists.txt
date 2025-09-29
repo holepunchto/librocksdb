@@ -25,7 +25,7 @@ fetch_package("github:holepunchto/libpath")
 fetch_package("github:holepunchto/libintrusive")
 
 fetch_package(
-  "github:facebook/rocksdb@9.11.1"
+  "github:facebook/rocksdb@10.5.1"
   SOURCE_DIR rocksdb_dir
   PATCHES
     patches/01-android-arm-time.patch
@@ -135,5 +135,6 @@ install(FILES include/rocksdb.h DESTINATION include)
 if(PROJECT_IS_TOP_LEVEL)
   enable_testing()
 
+  add_subdirectory(bench)
   add_subdirectory(test)
 endif()
