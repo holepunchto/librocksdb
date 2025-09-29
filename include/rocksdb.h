@@ -508,7 +508,7 @@ struct rocksdb_s {
 
   void *handle; // Opaque database pointer
 
-  int state;
+  _Atomic(int) state;
   int inflight;
 
   rocksdb_queue_t pending;
