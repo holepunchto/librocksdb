@@ -1410,23 +1410,6 @@ rocksdb_flush(rocksdb_t *db, rocksdb_flush_t *req, rocksdb_column_family_t *colu
   return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_flush, rocksdb__on_after_flush);
 }
 
-extern "C" int
-rocksdb_snapshot_create(rocksdb_t *db, rocksdb_snapshot_t *snapshot) {
-  auto handle = reinterpret_cast<DB *>(db->handle)->GetSnapshot();
-
-  if (handle == nullptr) return -1;
-
-  snapshot->db = db;
-  snapshot->handle = handle;
-
-  return 0;
-}
-
-extern "C" void
-rocksdb_snapshot_destroy(rocksdb_snapshot_t *snapshot) {
-  reinterpret_cast<DB *>(snapshot->db->handle)->ReleaseSnapshot(reinterpret_cast<const Snapshot *>(snapshot->handle));
-}
-
 namespace {
 
 static void
@@ -1583,4 +1566,21 @@ rocksdb_approximate_size(rocksdb_t *db, rocksdb_approximate_size_t *req, rocksdb
   rocksdb__add_req(req);
 
   return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_approximate_size, rocksdb__on_after_approximate_size);
+}
+
+extern "C" int
+rocksdb_snapshot_create(rocksdb_t *db, rocksdb_snapshot_t *snapshot) {
+  auto handle = reinterpret_cast<DB *>(db->handle)->GetSnapshot();
+
+  if (handle == nullptr) return -1;
+
+  snapshot->db = db;
+  snapshot->handle = handle;
+
+  return 0;
+}
+
+extern "C" void
+rocksdb_snapshot_destroy(rocksdb_snapshot_t *snapshot) {
+  reinterpret_cast<DB *>(snapshot->db->handle)->ReleaseSnapshot(reinterpret_cast<const Snapshot *>(snapshot->handle));
 }

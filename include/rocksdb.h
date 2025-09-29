@@ -447,12 +447,6 @@ struct rocksdb_flush_s {
   void *data;
 };
 
-struct rocksdb_snapshot_s {
-  rocksdb_t *db;
-
-  const void *handle; // Opaque snapshot pointer
-};
-
 struct rocksdb_compact_range_s {
   rocksdb_req_t req;
 
@@ -487,6 +481,12 @@ struct rocksdb_approximate_size_s {
   uint64_t result;
 
   void *data;
+};
+
+struct rocksdb_snapshot_s {
+  rocksdb_t *db;
+
+  const void *handle; // Opaque snapshot pointer
 };
 
 enum {
@@ -562,16 +562,16 @@ int
 rocksdb_flush(rocksdb_t *db, rocksdb_flush_t *req, rocksdb_column_family_t *column_family, const rocksdb_flush_options_t *options, rocksdb_flush_cb cb);
 
 int
-rocksdb_snapshot_create(rocksdb_t *db, rocksdb_snapshot_t *snapshot);
-
-void
-rocksdb_snapshot_destroy(rocksdb_snapshot_t *snapshot);
-
-int
 rocksdb_compact_range(rocksdb_t *db, rocksdb_compact_range_t *req, rocksdb_column_family_t *column_family, rocksdb_slice_t start, rocksdb_slice_t end, const rocksdb_compact_range_options_t *options, rocksdb_compact_range_cb cb);
 
 int
 rocksdb_approximate_size(rocksdb_t *db, rocksdb_approximate_size_t *req, rocksdb_column_family_t *column_family, rocksdb_slice_t start, rocksdb_slice_t end, const rocksdb_approximate_size_options_t *options, rocksdb_approximate_size_cb cb);
+
+int
+rocksdb_snapshot_create(rocksdb_t *db, rocksdb_snapshot_t *snapshot);
+
+void
+rocksdb_snapshot_destroy(rocksdb_snapshot_t *snapshot);
 
 #ifdef __cplusplus
 }
