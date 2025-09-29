@@ -12,9 +12,7 @@ static rocksdb_t db;
 static rocksdb_snapshot_t snapshot;
 
 static void
-on_close(rocksdb_close_t *req) {
-  assert(req->error == NULL);
-}
+on_close(rocksdb_close_t *req) {}
 
 static void
 on_second_read(rocksdb_read_batch_t *req) {

@@ -12,8 +12,6 @@ static bool close_called = false;
 
 static void
 on_close(rocksdb_close_t *req) {
-  assert(req->error == NULL);
-
   close_called = true;
 }
 

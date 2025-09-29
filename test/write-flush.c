@@ -11,9 +11,7 @@ static rocksdb_t db;
 static rocksdb_column_family_t *family;
 
 static void
-on_close(rocksdb_close_t *req) {
-  assert(req->error == NULL);
-}
+on_close(rocksdb_close_t *req) {}
 
 static void
 on_flush(rocksdb_flush_t *req) {

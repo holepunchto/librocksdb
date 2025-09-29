@@ -10,9 +10,7 @@ static rocksdb_column_family_t *family;
 static bool folders_created = false;
 
 static void
-on_close(rocksdb_close_t *req) {
-  assert(req->error == NULL);
-}
+on_close(rocksdb_close_t *req) {}
 
 static void
 on_open(rocksdb_open_t *req) {

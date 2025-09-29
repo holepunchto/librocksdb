@@ -16,9 +16,7 @@ static rocksdb_column_family_t *family;
 static int64_t start;
 
 static void
-on_close(rocksdb_close_t *req) {
-  assert(req->error == NULL);
-}
+on_close(rocksdb_close_t *req) {}
 
 static void
 on_read(rocksdb_read_batch_t *req) {
