@@ -491,7 +491,6 @@ rocksdb__on_open(uv_work_t *handle) {
 extern "C" int
 rocksdb_open(rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_open_cb cb) {
   req->req.db = db;
-  req->req.cancelable = true;
   req->options = options ? *options : rocksdb__default_options;
   req->column_families = column_families;
   req->handles = handles;
@@ -550,21 +549,12 @@ rocksdb__on_close(uv_work_t *handle) {
 extern "C" int
 rocksdb_close(rocksdb_t *db, rocksdb_close_t *req, rocksdb_close_cb cb) {
   req->req.db = db;
-  req->req.cancelable = false;
   req->error = nullptr;
   req->cb = cb;
 
   req->req.worker.data = static_cast<void *>(req);
 
   db->close = req;
-
-  intrusive_ring_for_each(next, db->reqs) {
-    auto req = intrusive_entry(next, rocksdb_req_t, reqs);
-
-    if (req->cancelable) {
-      uv_cancel(reinterpret_cast<uv_req_t *>(&req->worker));
-    }
-  }
 
   return rocksdb__close_maybe(db);
 }
@@ -646,7 +636,6 @@ rocksdb_suspend(rocksdb_t *db, rocksdb_suspend_t *req, rocksdb_suspend_cb cb) {
   db->state |= rocksdb_suspending;
 
   req->req.db = db;
-  req->req.cancelable = true;
   req->error = nullptr;
   req->cb = cb;
 
@@ -720,7 +709,6 @@ rocksdb_resume(rocksdb_t *db, rocksdb_resume_t *req, rocksdb_resume_cb cb) {
   db->state |= rocksdb_resuming;
 
   req->req.db = db;
-  req->req.cancelable = true;
   req->error = nullptr;
   req->cb = cb;
 
@@ -1025,7 +1013,6 @@ rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_fam
   }
 
   req->req.db = db;
-  req->req.cancelable = true;
   req->options = options ? *options : rocksdb__default_iterator_options;
   req->column_family = column_family;
   req->range = range;
@@ -1053,7 +1040,6 @@ rocksdb__on_iterator_close(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_iterator_close(rocksdb_iterator_t *req, rocksdb_iterator_cb cb) {
-  req->req.cancelable = false;
   req->cb = cb;
 
   rocksdb__add_req(req);
@@ -1255,7 +1241,6 @@ rocksdb_read(rocksdb_t *db, rocksdb_read_batch_t *req, rocksdb_read_t *reads, si
   }
 
   req->req.db = db;
-  req->req.cancelable = true;
   req->options = options ? *options : rocksdb__default_read_options;
   req->reads = reads;
   req->errors = nullptr;
@@ -1337,7 +1322,6 @@ rocksdb_write(rocksdb_t *db, rocksdb_write_batch_t *req, rocksdb_write_t *writes
   }
 
   req->req.db = db;
-  req->req.cancelable = true;
   req->options = options ? *options : rocksdb__default_write_options;
   req->writes = writes;
   req->error = nullptr;
@@ -1397,7 +1381,6 @@ rocksdb_flush(rocksdb_t *db, rocksdb_flush_t *req, rocksdb_column_family_t *colu
   }
 
   req->req.db = db;
-  req->req.cancelable = true;
   req->column_family = column_family;
   req->options = options ? *options : rocksdb__default_flush_options;
   req->error = nullptr;
@@ -1468,7 +1451,6 @@ rocksdb_compact_range(rocksdb_t *db, rocksdb_compact_range_t *req, rocksdb_colum
   }
 
   req->req.db = db;
-  req->req.cancelable = true;
   req->column_family = column_family;
   req->start = start;
   req->end = end;
@@ -1553,7 +1535,6 @@ rocksdb_approximate_size(rocksdb_t *db, rocksdb_approximate_size_t *req, rocksdb
   }
 
   req->req.db = db;
-  req->req.cancelable = true;
   req->column_family = column_family;
   req->start = start;
   req->end = end;

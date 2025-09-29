@@ -267,8 +267,6 @@ struct rocksdb_req_s {
   rocksdb_t *db;
 
   intrusive_ring_t reqs;
-
-  bool cancelable;
 };
 
 struct rocksdb_open_s {
