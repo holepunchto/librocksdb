@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <uv.h>
@@ -38,18 +39,20 @@ typedef struct rocksdb_flush_s rocksdb_flush_t;
 typedef struct rocksdb_snapshot_s rocksdb_snapshot_t;
 typedef struct rocksdb_compact_range_s rocksdb_compact_range_t;
 typedef struct rocksdb_approximate_size_s rocksdb_approximate_size_t;
+typedef struct rocksdb_queue_s rocksdb_queue_t;
 typedef struct rocksdb_s rocksdb_t;
 
-typedef void (*rocksdb_open_cb)(rocksdb_open_t *req, int status);
-typedef void (*rocksdb_close_cb)(rocksdb_close_t *req, int status);
-typedef void (*rocksdb_suspend_cb)(rocksdb_suspend_t *req, int status);
-typedef void (*rocksdb_resume_cb)(rocksdb_resume_t *req, int status);
-typedef void (*rocksdb_iterator_cb)(rocksdb_iterator_t *iterator, int status);
-typedef void (*rocksdb_read_batch_cb)(rocksdb_read_batch_t *batch, int status);
-typedef void (*rocksdb_write_batch_cb)(rocksdb_write_batch_t *batch, int status);
-typedef void (*rocksdb_flush_cb)(rocksdb_flush_t *req, int status);
-typedef void (*rocksdb_compact_range_cb)(rocksdb_compact_range_t *req, int status);
-typedef void (*rocksdb_approximate_size_cb)(rocksdb_approximate_size_t *req, int status);
+typedef void (*rocksdb_cb)(rocksdb_req_t *req);
+typedef void (*rocksdb_open_cb)(rocksdb_open_t *req);
+typedef void (*rocksdb_close_cb)(rocksdb_close_t *req);
+typedef void (*rocksdb_suspend_cb)(rocksdb_suspend_t *req);
+typedef void (*rocksdb_resume_cb)(rocksdb_resume_t *req);
+typedef void (*rocksdb_iterator_cb)(rocksdb_iterator_t *iterator);
+typedef void (*rocksdb_read_batch_cb)(rocksdb_read_batch_t *batch);
+typedef void (*rocksdb_write_batch_cb)(rocksdb_write_batch_t *batch);
+typedef void (*rocksdb_flush_cb)(rocksdb_flush_t *req);
+typedef void (*rocksdb_compact_range_cb)(rocksdb_compact_range_t *req);
+typedef void (*rocksdb_approximate_size_cb)(rocksdb_approximate_size_t *req);
 
 /** @version 2 */
 struct rocksdb_options_s {
@@ -261,9 +264,12 @@ struct rocksdb_column_family_descriptor_s {
 };
 
 struct rocksdb_req_s {
-  uv_work_t worker;
+  _Atomic(rocksdb_req_t *) next;
 
   rocksdb_t *db;
+
+  rocksdb_cb work;
+  rocksdb_cb complete;
 };
 
 struct rocksdb_open_s {
@@ -287,8 +293,6 @@ struct rocksdb_open_s {
 
 struct rocksdb_close_s {
   rocksdb_req_t req;
-
-  char *error;
 
   rocksdb_close_cb cb;
 
@@ -484,19 +488,31 @@ struct rocksdb_snapshot_s {
   const void *handle; // Opaque snapshot pointer
 };
 
+struct rocksdb_queue_s {
+  _Atomic(rocksdb_req_t *) head;
+  _Atomic(rocksdb_req_t *) tail;
+};
+
 enum {
   rocksdb_suspending = 0x1,
   rocksdb_suspended = 0x2,
   rocksdb_resuming = 0x4,
+  rocksdb_closed = 0x8,
 };
 
 struct rocksdb_s {
-  uv_loop_t *loop;
+  uv_async_t signal;
+  uv_mutex_t lock;
+  uv_cond_t available;
+  uv_thread_t thread;
 
   void *handle; // Opaque database pointer
 
   int state;
   int inflight;
+
+  rocksdb_queue_t pending;
+  rocksdb_queue_t complete;
 
   rocksdb_close_t *close;
 };

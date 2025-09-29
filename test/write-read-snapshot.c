@@ -12,17 +12,13 @@ static rocksdb_t db;
 static rocksdb_snapshot_t snapshot;
 
 static void
-on_close(rocksdb_close_t *req, int status) {
-  assert(status == 0);
-
+on_close(rocksdb_close_t *req) {
   assert(req->error == NULL);
 }
 
 static void
-on_second_read(rocksdb_read_batch_t *req, int status) {
+on_second_read(rocksdb_read_batch_t *req) {
   int e;
-
-  assert(status == 0);
 
   assert(req->len == 1);
 
@@ -39,10 +35,8 @@ on_second_read(rocksdb_read_batch_t *req, int status) {
 }
 
 static void
-on_first_read(rocksdb_read_batch_t *req, int status) {
+on_first_read(rocksdb_read_batch_t *req) {
   int e;
-
-  assert(status == 0);
 
   assert(req->len == 1);
 
@@ -60,10 +54,8 @@ on_first_read(rocksdb_read_batch_t *req, int status) {
 }
 
 static void
-on_second_write(rocksdb_write_batch_t *req, int status) {
+on_second_write(rocksdb_write_batch_t *req) {
   int e;
-
-  assert(status == 0);
 
   assert(req->error == NULL);
 
@@ -84,10 +76,8 @@ on_second_write(rocksdb_write_batch_t *req, int status) {
 }
 
 static void
-on_first_write(rocksdb_write_batch_t *req, int status) {
+on_first_write(rocksdb_write_batch_t *req) {
   int e;
-
-  assert(status == 0);
 
   assert(req->error == NULL);
 
@@ -106,10 +96,8 @@ on_first_write(rocksdb_write_batch_t *req, int status) {
 }
 
 static void
-on_open(rocksdb_open_t *req, int status) {
+on_open(rocksdb_open_t *req) {
   int e;
-
-  assert(status == 0);
 
   assert(req->error == NULL);
 

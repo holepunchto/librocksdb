@@ -11,19 +11,15 @@ static bool open_called = false;
 static bool close_called = false;
 
 static void
-on_close(rocksdb_close_t *req, int status) {
-  assert(status == 0);
-
+on_close(rocksdb_close_t *req) {
   assert(req->error == NULL);
 
   close_called = true;
 }
 
 static void
-on_open(rocksdb_open_t *req, int status) {
+on_open(rocksdb_open_t *req) {
   int e;
-
-  assert(status == 0);
 
   assert(req->error == NULL);
 

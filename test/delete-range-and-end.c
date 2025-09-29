@@ -11,17 +11,13 @@ static rocksdb_t db;
 static rocksdb_column_family_t *family;
 
 static void
-on_close(rocksdb_close_t *req, int status) {
-  assert(status == 0);
-
+on_close(rocksdb_close_t *req) {
   assert(req->error == NULL);
 }
 
 static void
-on_read(rocksdb_read_batch_t *req, int status) {
+on_read(rocksdb_read_batch_t *req) {
   int e;
-
-  assert(status == 0);
 
 #define V(i, v) \
   assert(req->errors[i] == NULL); \
@@ -50,10 +46,8 @@ on_read(rocksdb_read_batch_t *req, int status) {
 }
 
 static void
-on_delete(rocksdb_write_batch_t *req, int status) {
+on_delete(rocksdb_write_batch_t *req) {
   int e;
-
-  assert(status == 0);
 
   static rocksdb_read_t reads[5];
 
@@ -75,10 +69,8 @@ on_delete(rocksdb_write_batch_t *req, int status) {
 }
 
 static void
-on_write(rocksdb_write_batch_t *req, int status) {
+on_write(rocksdb_write_batch_t *req) {
   int e;
-
-  assert(status == 0);
 
   assert(req->error == NULL);
 
@@ -99,10 +91,8 @@ on_write(rocksdb_write_batch_t *req, int status) {
 }
 
 static void
-on_open(rocksdb_open_t *req, int status) {
+on_open(rocksdb_open_t *req) {
   int e;
-
-  assert(status == 0);
 
   assert(req->error == NULL);
 

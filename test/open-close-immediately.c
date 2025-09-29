@@ -11,28 +11,22 @@ static bool open_called = false;
 static bool close_called = false;
 
 static void
-on_close(rocksdb_close_t *req, int status) {
-  assert(status == 0);
-
+on_close(rocksdb_close_t *req) {
   assert(req->error == NULL);
 
   close_called = true;
 }
 
 static void
-on_open(rocksdb_open_t *req, int status) {
+on_open(rocksdb_open_t *req) {
   int e;
-
-  assert(status == 0 || status == UV_ECANCELED);
 
   assert(req->error == NULL);
 
   open_called = true;
 
-  if (status == 0) {
-    e = rocksdb_column_family_destroy(&db, family);
-    assert(e == 0);
-  }
+  e = rocksdb_column_family_destroy(&db, family);
+  assert(e == 0);
 }
 
 int

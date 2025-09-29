@@ -11,17 +11,13 @@ static rocksdb_t db;
 static rocksdb_column_family_t *family;
 
 static void
-on_close(rocksdb_close_t *req, int status) {
-  assert(status == 0);
-
+on_close(rocksdb_close_t *req) {
   assert(req->error == NULL);
 }
 
 static void
-on_flush(rocksdb_flush_t *req, int status) {
+on_flush(rocksdb_flush_t *req) {
   int e;
-
-  assert(status == 0);
 
   e = rocksdb_column_family_destroy(&db, family);
   assert(e == 0);
@@ -32,10 +28,8 @@ on_flush(rocksdb_flush_t *req, int status) {
 }
 
 static void
-on_write(rocksdb_write_batch_t *req, int status) {
+on_write(rocksdb_write_batch_t *req) {
   int e;
-
-  assert(status == 0);
 
   static rocksdb_flush_t flush;
   e = rocksdb_flush(&db, &flush, family, NULL, on_flush);
@@ -43,10 +37,8 @@ on_write(rocksdb_write_batch_t *req, int status) {
 }
 
 static void
-on_open(rocksdb_open_t *req, int status) {
+on_open(rocksdb_open_t *req) {
   int e;
-
-  assert(status == 0);
 
   assert(req->error == NULL);
 

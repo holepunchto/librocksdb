@@ -18,9 +18,7 @@ static int writing = 0;
 static int64_t start;
 
 static void
-on_close(rocksdb_close_t *req, int status) {
-  assert(status == 0);
-
+on_close(rocksdb_close_t *req) {
   assert(req->error == NULL);
 }
 
@@ -28,10 +26,8 @@ static void
 loop_read(void);
 
 static void
-on_read(rocksdb_read_batch_t *req, int status) {
+on_read(rocksdb_read_batch_t *req) {
   int e;
-
-  assert(status == 0);
 
   if (reading < ops) loop_read();
   else {
@@ -74,10 +70,8 @@ static void
 loop_write(void);
 
 static void
-on_write(rocksdb_write_batch_t *req, int status) {
+on_write(rocksdb_write_batch_t *req) {
   int e;
-
-  assert(status == 0);
 
   if (writing < ops) loop_write();
   else {
@@ -116,10 +110,8 @@ loop_write(void) {
 }
 
 static void
-on_open(rocksdb_open_t *req, int status) {
+on_open(rocksdb_open_t *req) {
   int e;
-
-  assert(status == 0);
 
   assert(req->error == NULL);
 
