@@ -5,7 +5,6 @@
 extern "C" {
 #endif
 
-#include <intrusive/ring.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <uv.h>
@@ -265,8 +264,6 @@ struct rocksdb_req_s {
   uv_work_t worker;
 
   rocksdb_t *db;
-
-  intrusive_ring_t reqs;
 };
 
 struct rocksdb_open_s {
@@ -499,8 +496,7 @@ struct rocksdb_s {
   void *handle; // Opaque database pointer
 
   int state;
-
-  intrusive_ring_t *reqs;
+  int inflight;
 
   rocksdb_close_t *close;
 };

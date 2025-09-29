@@ -22,7 +22,6 @@ set(ARTIFACT_SUFFIX _facebook) # Ensure that upstream RocksDB targets don't clas
 
 fetch_package("github:libuv/libuv@1.50.0")
 fetch_package("github:holepunchto/libpath")
-fetch_package("github:holepunchto/libintrusive")
 
 fetch_package(
   "github:facebook/rocksdb@10.5.1"
@@ -73,7 +72,6 @@ target_link_libraries(
     rocksdb_facebook
   PUBLIC
     path
-    intrusive
 )
 
 if(WIN32)

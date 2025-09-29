@@ -1,8 +1,6 @@
 #include <memory>
 #include <vector>
 
-#include <intrusive.h>
-#include <intrusive/ring.h>
 #include <path.h>
 #include <rocksdb/advanced_options.h>
 #include <rocksdb/convenience.h>
@@ -180,8 +178,8 @@ rocksdb_init(uv_loop_t *loop, rocksdb_t *db) {
   db->loop = loop;
   db->handle = nullptr;
   db->state = 0;
+  db->inflight = 0;
   db->close = nullptr;
-  db->reqs = nullptr;
 
   return 0;
 }
@@ -197,15 +195,7 @@ namespace {
 
 static inline void
 rocksdb__add_req(rocksdb_t *db, rocksdb_req_t *req) {
-  auto ring = &req->reqs;
-
-  intrusive_ring_init(ring);
-
-  if (db->reqs == nullptr) {
-    db->reqs = ring;
-  } else {
-    db->reqs = intrusive_ring_link(ring, db->reqs);
-  }
+  db->inflight++;
 }
 
 template <typename T>
@@ -216,9 +206,7 @@ rocksdb__add_req(T *req) {
 
 static inline void
 rocksdb__remove_req(rocksdb_t *db, rocksdb_req_t *req) {
-  auto ring = &req->reqs;
-
-  db->reqs = intrusive_ring_remove(ring);
+  db->inflight--;
 
   rocksdb__close_maybe(db);
 }
@@ -565,7 +553,7 @@ static inline int
 rocksdb__close_maybe(rocksdb_t *db) {
   rocksdb_close_t *req = db->close;
 
-  if (db->reqs || req == nullptr) return 0;
+  if (db->inflight > 0 || req == nullptr) return 0;
 
   db->close = nullptr;
 
