@@ -6,14 +6,12 @@
 
 #include "../include/rocksdb.h"
 
+#define ops (100000)
+
 static uv_loop_t *loop;
 
 static rocksdb_t db;
 static rocksdb_column_family_t *family;
-
-static int ops = 100000;
-static int reading = 0;
-static int writing = 0;
 
 static int64_t start;
 
@@ -52,14 +50,14 @@ on_write(rocksdb_write_batch_t *req, int status) {
 
   printf("%f writes/s\n", ops / (elapsed / 1e9));
 
-  static rocksdb_read_t reads[100000];
+  static rocksdb_read_t reads[ops];
 
   union {
     char buffer[4];
     uint32_t uint;
   } key;
 
-  for (int i = 0; i < 100000; i++) {
+  for (int i = 0; i < ops; i++) {
     rocksdb_read_t *read = &reads[i];
 
     key.uint = i + 1;
@@ -77,7 +75,7 @@ on_write(rocksdb_write_batch_t *req, int status) {
   start = uv_hrtime();
 
   static rocksdb_read_batch_t batch;
-  e = rocksdb_read(&db, &batch, reads, 100000, NULL, on_read);
+  e = rocksdb_read(&db, &batch, reads, ops, NULL, on_read);
   assert(e == 0);
 }
 
@@ -89,7 +87,7 @@ on_open(rocksdb_open_t *req, int status) {
 
   assert(req->error == NULL);
 
-  static rocksdb_write_t writes[100000];
+  static rocksdb_write_t writes[ops];
 
   union {
     char buffer[4];
@@ -98,7 +96,7 @@ on_open(rocksdb_open_t *req, int status) {
 
   static char value[512] = {0};
 
-  for (int i = 0; i < 100000; i++) {
+  for (int i = 0; i < ops; i++) {
     rocksdb_write_t *write = &writes[i];
 
     key.uint = i + 1;
@@ -116,7 +114,7 @@ on_open(rocksdb_open_t *req, int status) {
   start = uv_hrtime();
 
   static rocksdb_write_batch_t batch;
-  e = rocksdb_write(&db, &batch, writes, 100000, NULL, on_write);
+  e = rocksdb_write(&db, &batch, writes, ops, NULL, on_write);
   assert(e == 0);
 }
 
