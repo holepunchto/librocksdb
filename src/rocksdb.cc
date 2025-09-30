@@ -177,23 +177,21 @@ namespace {
 
 static inline void
 rocksdb__queue_init(rocksdb_queue_t &queue) {
-  queue.head = nullptr;
-  queue.tail = nullptr;
+  atomic_store(&queue.head, nullptr);
+  atomic_store(&queue.tail, nullptr);
 }
 
 static inline void
 rocksdb__queue_push(rocksdb_queue_t &queue, rocksdb_req_t *req) {
-  req->next = nullptr;
+  atomic_store(&req->next, nullptr);
 
-  auto tail = queue.tail;
+  auto tail = atomic_exchange(&queue.tail, req);
 
   if (tail) {
     atomic_store_explicit(&tail->next, req, memory_order_release);
   } else {
-    queue.head = req;
+    atomic_store(&queue.head, req);
   }
-
-  queue.tail = req;
 }
 
 template <typename T>
@@ -204,7 +202,7 @@ rocksdb__queue_push(rocksdb_queue_t &queue, T *req) {
 
 static inline rocksdb_req_t *
 rocksdb__queue_pop(rocksdb_queue_t &queue) {
-  auto head = queue.head;
+  auto head = atomic_load(&queue.head);
 
   if (!head) {
     return nullptr;
@@ -213,10 +211,10 @@ rocksdb__queue_pop(rocksdb_queue_t &queue) {
   auto next = atomic_load_explicit(&head->next, memory_order_acquire);
 
   if (next) {
-    queue.head = next;
+    atomic_store(&queue.head, next);
   } else {
-    queue.head = nullptr;
-    queue.tail = nullptr;
+    atomic_store(&queue.head, nullptr);
+    atomic_store(&queue.tail, nullptr);
   }
 
   return head;
