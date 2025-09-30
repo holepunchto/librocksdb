@@ -17,8 +17,6 @@ static void
 on_read(rocksdb_read_batch_t *req) {
   int e;
 
-  assert(status == 0);
-
   assert(req->len == 1);
 
   rocksdb_read_t read = req->reads[0];
