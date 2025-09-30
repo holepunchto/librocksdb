@@ -45,7 +45,7 @@ set_target_properties(
   rocksdb
   PROPERTIES
   C_STANDARD 11
-  CXX_STANDARD 20
+  CXX_STANDARD 23
   POSITION_INDEPENDENT_CODE ON
 )
 
