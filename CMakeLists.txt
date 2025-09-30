@@ -79,6 +79,7 @@ if(WIN32)
     rocksdb
     PUBLIC
       /GR-
+    PRIVATE
       /experimental:c11atomics
   )
 else()
