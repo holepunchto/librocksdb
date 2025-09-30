@@ -177,20 +177,20 @@ namespace {
 
 static inline void
 rocksdb__queue_init(rocksdb_queue_t &queue) {
-  atomic_store(&queue.head, nullptr);
-  atomic_store(&queue.tail, nullptr);
+  atomic_store_explicit(&queue.head, nullptr, memory_order_relaxed);
+  atomic_store_explicit(&queue.tail, nullptr, memory_order_relaxed);
 }
 
 static inline void
 rocksdb__queue_push(rocksdb_queue_t &queue, rocksdb_req_t *req) {
-  atomic_store(&req->next, nullptr);
+  atomic_store_explicit(&req->next, nullptr, memory_order_relaxed);
 
-  auto tail = atomic_exchange(&queue.tail, req);
+  auto tail = atomic_exchange_explicit(&queue.tail, req, memory_order_relaxed);
 
   if (tail) {
     atomic_store_explicit(&tail->next, req, memory_order_release);
   } else {
-    atomic_store(&queue.head, req);
+    atomic_store_explicit(&queue.head, req, memory_order_release);
   }
 }
 
@@ -202,7 +202,7 @@ rocksdb__queue_push(rocksdb_queue_t &queue, T *req) {
 
 static inline rocksdb_req_t *
 rocksdb__queue_pop(rocksdb_queue_t &queue) {
-  auto head = atomic_load(&queue.head);
+  auto head = atomic_load_explicit(&queue.head, memory_order_relaxed);
 
   if (!head) {
     return nullptr;
@@ -211,10 +211,10 @@ rocksdb__queue_pop(rocksdb_queue_t &queue) {
   auto next = atomic_load_explicit(&head->next, memory_order_acquire);
 
   if (next) {
-    atomic_store(&queue.head, next);
+    atomic_store_explicit(&queue.head, next, memory_order_relaxed);
   } else {
-    atomic_store(&queue.head, nullptr);
-    atomic_store(&queue.tail, nullptr);
+    atomic_store_explicit(&queue.head, nullptr, memory_order_relaxed);
+    atomic_store_explicit(&queue.tail, nullptr, memory_order_relaxed);
   }
 
   return head;
