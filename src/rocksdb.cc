@@ -263,6 +263,8 @@ rocksdb__on_thread(void *data) {
 
   auto db = reinterpret_cast<rocksdb_t *>(data);
 
+  int pending = 0;
+
   while (true) {
     rocksdb_req_t *req;
 
@@ -272,6 +274,13 @@ rocksdb__on_thread(void *data) {
       req = rocksdb__queue_pop(db->pending);
 
       if (req != nullptr) break;
+
+      if (pending > 0) {
+        pending = 0;
+
+        err = uv_async_send(&db->signal);
+        assert(err == 0);
+      }
 
       uv_cond_wait(&db->available, &db->lock);
 
@@ -288,8 +297,12 @@ rocksdb__on_thread(void *data) {
 
     rocksdb__queue_push(db->complete, req);
 
-    err = uv_async_send(&db->signal);
-    assert(err == 0);
+    if (++pending >= 128) {
+      pending = 0;
+
+      err = uv_async_send(&db->signal);
+      assert(err == 0);
+    }
   }
 }
 
