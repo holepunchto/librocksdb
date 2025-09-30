@@ -79,6 +79,7 @@ if(WIN32)
     rocksdb
     PUBLIC
       /GR-
+      /experimental:c11atomics
   )
 else()
   target_compile_options(
