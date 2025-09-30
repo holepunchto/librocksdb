@@ -1,3 +1,4 @@
+#include <atomic>
 #include <memory>
 #include <vector>
 
@@ -8,11 +9,13 @@
 #include <rocksdb/filter_policy.h>
 #include <rocksdb/options.h>
 #include <rocksdb/table.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 #include <uv.h>
 
 #include "../include/rocksdb.h"
+
 #include "fs.h"
 
 using namespace rocksdb;
