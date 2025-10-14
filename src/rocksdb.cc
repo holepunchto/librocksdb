@@ -231,7 +231,9 @@ rocksdb__on_after_open(uv_work_t *handle, int status) {
 
   auto error = req->error;
 
-  if (error == nullptr && db->state != rocksdb_closing) db->state = rocksdb_active;
+  if (db->state != rocksdb_closing) {
+    if (error == nullptr) db->state = rocksdb_active;
+  }
 
   req->cb(req, status);
 
@@ -586,7 +588,10 @@ rocksdb__on_after_suspend(uv_work_t *handle, int status) {
 
   auto error = req->error;
 
-  if (error == nullptr && db->state != rocksdb_closing) db->state = rocksdb_suspended;
+  if (db->state != rocksdb_closing) {
+    if (error == nullptr) db->state = rocksdb_suspended;
+    else db->state = rocksdb_active;
+  }
 
   req->cb(req, status);
 
@@ -647,7 +652,10 @@ rocksdb__on_after_resume(uv_work_t *handle, int status) {
 
   auto error = req->error;
 
-  if (error == nullptr && db->state != rocksdb_closing) db->state = rocksdb_active;
+  if (db->state != rocksdb_closing) {
+    if (error == nullptr) db->state = rocksdb_active;
+    else db->state = rocksdb_suspended;
+  }
 
   req->cb(req, status);
 
