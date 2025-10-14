@@ -225,9 +225,13 @@ static inline void
 rocksdb__on_after_open(uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_open_t *>(handle->data);
 
+  auto db = req->req.db;
+
   rocksdb__remove_req(req);
 
   auto error = req->error;
+
+  if (error == nullptr && db->state != rocksdb_closing) db->state = rocksdb_active;
 
   req->cb(req, status);
 
@@ -522,20 +526,22 @@ rocksdb__on_close(uv_work_t *handle) {
 
   if (status.ok()) {
     req->error = nullptr;
+
+    auto env = db->GetEnv();
+
+    delete db;
+    delete env;
   } else {
     req->error = strdup(status.getState());
   }
-
-  auto env = db->GetEnv();
-
-  delete db;
-  delete env;
 }
 
 } // namespace
 
 extern "C" int
 rocksdb_close(rocksdb_t *db, rocksdb_close_t *req, rocksdb_close_cb cb) {
+  db->state = rocksdb_closing;
+
   req->req.db = db;
   req->error = nullptr;
   req->cb = cb;
@@ -576,13 +582,11 @@ rocksdb__on_after_suspend(uv_work_t *handle, int status) {
 
   auto db = req->req.db;
 
-  db->state &= ~rocksdb_suspending;
-
   rocksdb__remove_req(req);
 
   auto error = req->error;
 
-  if (error == nullptr) db->state |= rocksdb_suspended;
+  if (error == nullptr && db->state != rocksdb_closing) db->state = rocksdb_suspended;
 
   req->cb(req, status);
 
@@ -614,14 +618,11 @@ rocksdb__on_suspend(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_suspend(rocksdb_t *db, rocksdb_suspend_t *req, rocksdb_suspend_cb cb) {
-  if (
-    (db->state & rocksdb_suspended) != 0 ||
-    (db->state & rocksdb_suspending) != 0
-  ) {
+  if (db->state != rocksdb_active) {
     return UV_EINVAL;
   }
 
-  db->state |= rocksdb_suspending;
+  db->state = rocksdb_suspending;
 
   req->req.db = db;
   req->error = nullptr;
@@ -642,13 +643,11 @@ rocksdb__on_after_resume(uv_work_t *handle, int status) {
 
   auto db = req->req.db;
 
-  db->state &= ~rocksdb_resuming;
-
   rocksdb__remove_req(req);
 
   auto error = req->error;
 
-  if (error == nullptr) db->state &= ~rocksdb_suspended;
+  if (error == nullptr && db->state != rocksdb_closing) db->state = rocksdb_active;
 
   req->cb(req, status);
 
@@ -686,15 +685,11 @@ rocksdb__on_resume(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_resume(rocksdb_t *db, rocksdb_resume_t *req, rocksdb_resume_cb cb) {
-  if (
-    (db->state & rocksdb_suspended) == 0 ||
-    (db->state & rocksdb_suspending) != 0 ||
-    (db->state & rocksdb_resuming) != 0
-  ) {
+  if (db->state != rocksdb_suspended) {
     return UV_EINVAL;
   }
 
-  db->state |= rocksdb_resuming;
+  db->state = rocksdb_resuming;
 
   req->req.db = db;
   req->error = nullptr;
@@ -993,11 +988,8 @@ rocksdb__on_iterator_open(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_family_t *column_family, rocksdb_range_t range, const rocksdb_iterator_options_t *options, rocksdb_iterator_cb cb) {
-  if (
-    (db->state & rocksdb_suspended) != 0 ||
-    (db->state & rocksdb_suspending) != 0
-  ) {
-    return UV_EBUSY;
+  if (db->state != rocksdb_active) {
+    return UV_EINVAL;
   }
 
   req->req.db = db;
@@ -1060,11 +1052,8 @@ extern "C" int
 rocksdb_iterator_refresh(rocksdb_iterator_t *req, rocksdb_range_t range, const rocksdb_iterator_options_t *options, rocksdb_iterator_cb cb) {
   auto db = req->req.db;
 
-  if (
-    (db->state & rocksdb_suspended) != 0 ||
-    (db->state & rocksdb_suspending) != 0
-  ) {
-    return UV_EBUSY;
+  if (db->state != rocksdb_active) {
+    return UV_EINVAL;
   }
 
   req->options = options ? *options : rocksdb__default_iterator_options;
@@ -1101,11 +1090,8 @@ extern "C" int
 rocksdb_iterator_read(rocksdb_iterator_t *req, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb) {
   auto db = req->req.db;
 
-  if (
-    (db->state & rocksdb_suspended) != 0 ||
-    (db->state & rocksdb_suspending) != 0
-  ) {
-    return UV_EBUSY;
+  if (db->state != rocksdb_active) {
+    return UV_EINVAL;
   }
 
   req->cb = cb;
@@ -1221,11 +1207,8 @@ rocksdb__on_read(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_read(rocksdb_t *db, rocksdb_read_batch_t *req, rocksdb_read_t *reads, size_t len, const rocksdb_read_options_t *options, rocksdb_read_batch_cb cb) {
-  if (
-    (db->state & rocksdb_suspended) != 0 ||
-    (db->state & rocksdb_suspending) != 0
-  ) {
-    return UV_EBUSY;
+  if (db->state != rocksdb_active) {
+    return UV_EINVAL;
   }
 
   req->req.db = db;
@@ -1302,11 +1285,8 @@ rocksdb__on_write(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_write(rocksdb_t *db, rocksdb_write_batch_t *req, rocksdb_write_t *writes, size_t len, const rocksdb_write_options_t *options, rocksdb_write_batch_cb cb) {
-  if (
-    (db->state & rocksdb_suspended) != 0 ||
-    (db->state & rocksdb_suspending) != 0
-  ) {
-    return UV_EBUSY;
+  if (db->state != rocksdb_active) {
+    return UV_EINVAL;
   }
 
   req->req.db = db;
@@ -1361,11 +1341,8 @@ rocksdb__on_flush(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_flush(rocksdb_t *db, rocksdb_flush_t *req, rocksdb_column_family_t *column_family, const rocksdb_flush_options_t *options, rocksdb_flush_cb cb) {
-  if (
-    (db->state & rocksdb_suspended) != 0 ||
-    (db->state & rocksdb_suspending) != 0
-  ) {
-    return UV_EBUSY;
+  if (db->state != rocksdb_active) {
+    return UV_EINVAL;
   }
 
   req->req.db = db;
@@ -1431,11 +1408,8 @@ rocksdb__on_compact_range(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_compact_range(rocksdb_t *db, rocksdb_compact_range_t *req, rocksdb_column_family_t *column_family, rocksdb_slice_t start, rocksdb_slice_t end, const rocksdb_compact_range_options_t *options, rocksdb_compact_range_cb cb) {
-  if (
-    (db->state & rocksdb_suspended) != 0 ||
-    (db->state & rocksdb_suspending) != 0
-  ) {
-    return UV_EBUSY;
+  if (db->state != rocksdb_active) {
+    return UV_EINVAL;
   }
 
   req->req.db = db;
@@ -1515,11 +1489,8 @@ rocksdb__on_approximate_size(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_approximate_size(rocksdb_t *db, rocksdb_approximate_size_t *req, rocksdb_column_family_t *column_family, rocksdb_slice_t start, rocksdb_slice_t end, const rocksdb_approximate_size_options_t *options, rocksdb_approximate_size_cb cb) {
-  if (
-    (db->state & rocksdb_suspended) != 0 ||
-    (db->state & rocksdb_suspending) != 0
-  ) {
-    return UV_EBUSY;
+  if (db->state != rocksdb_active) {
+    return UV_EINVAL;
   }
 
   req->req.db = db;

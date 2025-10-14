@@ -485,9 +485,11 @@ struct rocksdb_snapshot_s {
 };
 
 enum {
-  rocksdb_suspending = 0x1,
-  rocksdb_suspended = 0x2,
-  rocksdb_resuming = 0x4,
+  rocksdb_active = 1,
+  rocksdb_suspending = 2,
+  rocksdb_suspended = 3,
+  rocksdb_resuming = 4,
+  rocksdb_closing = 5,
 };
 
 struct rocksdb_s {
