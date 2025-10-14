@@ -337,6 +337,9 @@ struct rocksdb_iterator_s {
 
   void *handle; // Opaque iterator pointer
 
+  int state;
+  bool inflight;
+
   rocksdb_range_t range;
 
   size_t len;

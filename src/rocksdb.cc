@@ -955,12 +955,16 @@ rocksdb__iterator_refresh(Iterator *iterator, T *req) {
 namespace {
 
 static void
-rocksdb__on_after_iterator(uv_work_t *handle, int status) {
+rocksdb__on_after_iterator_open(uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
 
   rocksdb__remove_req(req);
 
+  req->inflight = false;
+
   auto error = req->error;
+
+  if (error == nullptr) req->state = rocksdb_active;
 
   req->cb(req, status);
 
@@ -996,16 +1000,34 @@ rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_fam
   req->options = options ? *options : rocksdb__default_iterator_options;
   req->column_family = column_family;
   req->range = range;
+  req->state = 0;
+  req->inflight = true;
+  req->error = nullptr;
   req->cb = cb;
 
   req->req.worker.data = static_cast<void *>(req);
 
   rocksdb__add_req(req);
 
-  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_iterator_open, rocksdb__on_after_iterator);
+  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_iterator_open, rocksdb__on_after_iterator_open);
 }
 
 namespace {
+
+static void
+rocksdb__on_after_iterator_close(uv_work_t *handle, int status) {
+  auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
+
+  rocksdb__remove_req(req);
+
+  req->inflight = false;
+
+  auto error = req->error;
+
+  req->cb(req, status);
+
+  if (error) free(error);
+}
 
 static void
 rocksdb__on_iterator_close(uv_work_t *handle) {
@@ -1020,14 +1042,38 @@ rocksdb__on_iterator_close(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_iterator_close(rocksdb_iterator_t *req, rocksdb_iterator_cb cb) {
+  auto db = req->req.db;
+
+  if (db->state != rocksdb_active || req->state != rocksdb_active || req->inflight) {
+    return UV_EINVAL;
+  }
+
+  req->state = rocksdb_closing;
+  req->inflight = true;
+  req->error = nullptr;
   req->cb = cb;
 
   rocksdb__add_req(req);
 
-  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_iterator_close, rocksdb__on_after_iterator);
+  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_iterator_close, rocksdb__on_after_iterator_close);
 }
 
 namespace {
+
+static void
+rocksdb__on_after_iterator_refresh(uv_work_t *handle, int status) {
+  auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
+
+  rocksdb__remove_req(req);
+
+  req->inflight = false;
+
+  auto error = req->error;
+
+  req->cb(req, status);
+
+  if (error) free(error);
+}
 
 static void
 rocksdb__on_iterator_refresh(uv_work_t *handle) {
@@ -1052,20 +1098,37 @@ extern "C" int
 rocksdb_iterator_refresh(rocksdb_iterator_t *req, rocksdb_range_t range, const rocksdb_iterator_options_t *options, rocksdb_iterator_cb cb) {
   auto db = req->req.db;
 
-  if (db->state != rocksdb_active) {
+  if (db->state != rocksdb_active || req->state != rocksdb_active || req->inflight) {
     return UV_EINVAL;
   }
 
   req->options = options ? *options : rocksdb__default_iterator_options;
   req->range = range;
+  req->inflight = true;
+  req->error = nullptr;
   req->cb = cb;
 
   rocksdb__add_req(req);
 
-  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_iterator_close, rocksdb__on_after_iterator);
+  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_iterator_close, rocksdb__on_after_iterator_refresh);
 }
 
 namespace {
+
+static void
+rocksdb__on_after_iterator_read(uv_work_t *handle, int status) {
+  auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
+
+  rocksdb__remove_req(req);
+
+  req->inflight = false;
+
+  auto error = req->error;
+
+  req->cb(req, status);
+
+  if (error) free(error);
+}
 
 static void
 rocksdb__on_iterator_read(uv_work_t *handle) {
@@ -1090,19 +1153,21 @@ extern "C" int
 rocksdb_iterator_read(rocksdb_iterator_t *req, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb) {
   auto db = req->req.db;
 
-  if (db->state != rocksdb_active) {
+  if (db->state != rocksdb_active || req->state != rocksdb_active || req->inflight) {
     return UV_EINVAL;
   }
 
-  req->cb = cb;
   req->keys = keys;
   req->values = values;
   req->len = 0;
   req->capacity = capacity;
+  req->inflight = true;
+  req->error = nullptr;
+  req->cb = cb;
 
   rocksdb__add_req(req);
 
-  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_iterator_read, rocksdb__on_after_iterator);
+  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_iterator_read, rocksdb__on_after_iterator_read);
 }
 
 namespace {
