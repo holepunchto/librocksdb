@@ -1052,9 +1052,7 @@ extern "C" int
 rocksdb_iterator_close(rocksdb_iterator_t *req, rocksdb_iterator_cb cb) {
   auto db = req->req.db;
 
-  if (db->state != rocksdb_active || req->state != rocksdb_active || req->inflight) {
-    return UV_EINVAL;
-  }
+  if (req->inflight) return UV_EINVAL;
 
   req->state = rocksdb_closing;
   req->inflight = true;
