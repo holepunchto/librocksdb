@@ -214,15 +214,11 @@ private:
     }
 
     IOStatus Close(const IOOptions &options, IODebugContext *dbg) override {
-      return fs->unless_suspended<IOStatus>([&] {
-        return file->Close(options, dbg);
-      });
+      return file->Close(options, dbg);
     }
 
     IOStatus Flush(const IOOptions &options, IODebugContext *dbg) override {
-      return fs->unless_suspended<IOStatus>([&] {
-        return file->Flush(options, dbg);
-      });
+      return file->Flush(options, dbg);
     }
 
     IOStatus Sync(const IOOptions &options, IODebugContext *dbg) override {
@@ -332,9 +328,7 @@ private:
     }
 
     IOStatus Flush(const IOOptions &options, IODebugContext *dbg) override {
-      return fs->unless_suspended<IOStatus>([&] {
-        return file->Flush(options, dbg);
-      });
+      return file->Flush(options, dbg);
     }
 
     IOStatus Sync(const IOOptions &options, IODebugContext *dbg) override {
@@ -350,9 +344,7 @@ private:
     }
 
     IOStatus Close(const IOOptions &options, IODebugContext *dbg) override {
-      return fs->unless_suspended<IOStatus>([&] {
-        return file->Close(options, dbg);
-      });
+      return file->Close(options, dbg);
     }
 
     Temperature GetTemperature() const override {
@@ -384,9 +376,7 @@ private:
     }
 
     IOStatus Close(const IOOptions &options, IODebugContext *dbg) override {
-      return fs->unless_suspended<IOStatus>([&] {
-        return dir->Close(options, dbg);
-      });
+      return dir->Close(options, dbg);
     }
 
     size_t GetUniqueId(char *id, size_t max_size) const override {
@@ -509,15 +499,11 @@ private:
   }
 
   Status RegisterDbPaths(const std::vector<std::string> &paths) override {
-    return unless_suspended<Status>([&] {
-      return fs->RegisterDbPaths(paths);
-    });
+    return fs->RegisterDbPaths(paths);
   }
 
   Status UnregisterDbPaths(const std::vector<std::string> &paths) override {
-    return unless_suspended<Status>([&] {
-      return fs->UnregisterDbPaths(paths);
-    });
+    return fs->UnregisterDbPaths(paths);
   }
 
   IOStatus NewSequentialFile(const std::string &fname, const FileOptions &options, std::unique_ptr<FSSequentialFile> *result, IODebugContext *dbg) override {
@@ -647,21 +633,15 @@ private:
   }
 
   IOStatus FileExists(const std::string &fname, const IOOptions &options, IODebugContext *dbg) override {
-    return unless_suspended<IOStatus>([&] {
-      return fs->FileExists(fname, options, dbg);
-    });
+    return fs->FileExists(fname, options, dbg);
   }
 
   IOStatus GetChildren(const std::string &dir, const IOOptions &options, std::vector<std::string> *result, IODebugContext *dbg) override {
-    return unless_suspended<IOStatus>([&] {
-      return fs->GetChildren(dir, options, result, dbg);
-    });
+    return fs->GetChildren(dir, options, result, dbg);
   }
 
   IOStatus GetChildrenFileAttributes(const std::string &dir, const IOOptions &options, std::vector<FileAttributes> *result, IODebugContext *dbg) override {
-    return unless_suspended<IOStatus>([&] {
-      return fs->GetChildrenFileAttributes(dir, options, result, dbg);
-    });
+    return fs->GetChildrenFileAttributes(dir, options, result, dbg);
   }
 
   IOStatus DeleteFile(const std::string &fname, const IOOptions &options, IODebugContext *dbg) override {
@@ -695,15 +675,11 @@ private:
   }
 
   IOStatus GetFileSize(const std::string &fname, const IOOptions &options, uint64_t *file_size, IODebugContext *dbg) override {
-    return unless_suspended<IOStatus>([&] {
-      return fs->GetFileSize(fname, options, file_size, dbg);
-    });
+    return fs->GetFileSize(fname, options, file_size, dbg);
   }
 
   IOStatus GetFileModificationTime(const std::string &fname, const IOOptions &options, uint64_t *file_mtime, IODebugContext *dbg) override {
-    return unless_suspended<IOStatus>([&] {
-      return fs->GetFileModificationTime(fname, options, file_mtime, dbg);
-    });
+    return fs->GetFileModificationTime(fname, options, file_mtime, dbg);
   }
 
   IOStatus RenameFile(const std::string &src, const std::string &target, const IOOptions &options, IODebugContext *dbg) override {
@@ -743,9 +719,7 @@ private:
   }
 
   IOStatus GetAbsolutePath(const std::string &db_path, const IOOptions &options, std::string *output_path, IODebugContext *dbg) override {
-    return unless_suspended<IOStatus>([&] {
-      return fs->GetAbsolutePath(db_path, options, output_path, dbg);
-    });
+    return fs->GetAbsolutePath(db_path, options, output_path, dbg);
   }
 
   void SanitizeFileOptions(FileOptions *file_options) const override {
@@ -781,15 +755,11 @@ private:
   }
 
   IOStatus GetFreeSpace(const std::string &path, const IOOptions &options, uint64_t *diskfree, IODebugContext *dbg) override {
-    return unless_suspended<IOStatus>([&] {
-      return fs->GetFreeSpace(path, options, diskfree, dbg);
-    });
+    return fs->GetFreeSpace(path, options, diskfree, dbg);
   }
 
   IOStatus IsDirectory(const std::string &path, const IOOptions &options, bool *is_dir, IODebugContext *dbg) override {
-    return unless_suspended<IOStatus>([&] {
-      return fs->IsDirectory(path, options, is_dir, dbg);
-    });
+    return fs->IsDirectory(path, options, is_dir, dbg);
   }
 
   IOStatus Poll(std::vector<void *> &io_handles, size_t min_completions) override {
@@ -799,9 +769,7 @@ private:
   }
 
   IOStatus AbortIO(std::vector<void *> &io_handles) override {
-    return unless_suspended<IOStatus>([&] {
-      return fs->AbortIO(io_handles);
-    });
+    return fs->AbortIO(io_handles);
   }
 
   void DiscardCacheForDirectory(const std::string &path) override {

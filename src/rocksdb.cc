@@ -526,16 +526,14 @@ rocksdb__on_close(uv_work_t *handle) {
 
   auto status = db->Close();
 
-  if (status.ok()) {
-    req->error = nullptr;
+  req->error = status.ok() ? nullptr : strdup(status.getState());
 
-    auto env = db->GetEnv();
+  if (status.IsAborted()) return; // Snaphots are still held
 
-    delete db;
-    delete env;
-  } else {
-    req->error = strdup(status.getState());
-  }
+  auto env = db->GetEnv();
+
+  delete db;
+  delete env;
 }
 
 } // namespace
