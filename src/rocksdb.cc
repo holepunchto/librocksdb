@@ -15,6 +15,14 @@
 #include "../include/rocksdb.h"
 #include "fs.h"
 
+#if defined(__APPLE__)
+#include "lock/apple.h"
+#elif defined(__linux__)
+#include "lock/linux.h"
+#elif defined(_WIN32)
+#include "lock/win32.h"
+#endif
+
 using namespace rocksdb;
 
 static_assert(sizeof(Slice) == sizeof(rocksdb_slice_t));
@@ -632,6 +640,8 @@ rocksdb__on_suspend(uv_work_t *handle) {
 
   auto req = reinterpret_cast<rocksdb_suspend_t *>(handle->data);
 
+  auto lock = req->req.db->lock;
+
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
   auto fs = static_cast<rocksdb_file_system_t *>(db->GetFileSystem());
@@ -640,6 +650,8 @@ rocksdb__on_suspend(uv_work_t *handle) {
 
   if (status.ok()) {
     fs->suspend();
+
+    if (lock >= 0) rocksdb__unlock(lock);
 
     req->error = nullptr;
   } else {
@@ -695,6 +707,10 @@ rocksdb__on_resume(uv_work_t *handle) {
   int err;
 
   auto req = reinterpret_cast<rocksdb_resume_t *>(handle->data);
+
+  auto lock = req->req.db->lock;
+
+  if (lock >= 0) rocksdb__lock(lock);
 
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
