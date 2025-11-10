@@ -526,15 +526,15 @@ rocksdb__on_close(uv_work_t *handle) {
 
   auto status = db->Close();
 
-  if (status.ok()) {
+  if (status.IsAborted()) { // Snaphots are still held
+    req->error = strdup(status.getState());
+  } else {
     req->error = nullptr;
 
     auto env = db->GetEnv();
 
     delete db;
     delete env;
-  } else {
-    req->error = strdup(status.getState());
   }
 }
 
