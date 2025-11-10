@@ -55,6 +55,9 @@ target_sources(
     include/rocksdb.h
   PRIVATE
     src/fs.h
+    src/lock/apple.h
+    src/lock/linux.h
+    src/lock/win32.h
     src/rocksdb.cc
 )
 

@@ -15,6 +15,14 @@
 #include "../include/rocksdb.h"
 #include "fs.h"
 
+#if defined(__APPLE__)
+#include "lock/apple.h"
+#elif defined(__linux__)
+#include "lock/linux.h"
+#elif defined(_WIN32)
+#include "lock/win32.h"
+#endif
+
 using namespace rocksdb;
 
 static_assert(sizeof(Slice) == sizeof(rocksdb_slice_t));
@@ -54,7 +62,7 @@ rocksdb__from(rocksdb_pinning_tier_t pinning_tier) {
 namespace {
 
 static const rocksdb_options_t rocksdb__default_options = {
-  .version = 2,
+  .version = 3,
   .read_only = false,
   .create_if_missing = false,
   .create_missing_column_families = false,
@@ -66,6 +74,7 @@ static const rocksdb_options_t rocksdb__default_options = {
   .skip_stats_update_on_db_open = false,
   .use_direct_io_for_flush_and_compaction = false,
   .max_file_opening_threads = 16,
+  .lock = -1,
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
@@ -179,6 +188,7 @@ rocksdb_init(uv_loop_t *loop, rocksdb_t *db) {
   db->handle = nullptr;
   db->state = 0;
   db->inflight = 0;
+  db->lock = -1;
   db->close = nullptr;
 
   return 0;
@@ -286,6 +296,10 @@ rocksdb__on_open(uv_work_t *handle) {
 
   options.max_file_opening_threads = rocksdb__option<&rocksdb_options_t::max_file_opening_threads, bool>(
     &req->options, 2
+  );
+
+  auto lock = rocksdb__option<&rocksdb_options_t::lock, int>(
+    &req->options, 3
   );
 
   auto read_only = rocksdb__option<&rocksdb_options_t::read_only, bool>(
@@ -471,12 +485,22 @@ rocksdb__on_open(uv_work_t *handle) {
 
   if (status.ok()) {
     db->handle = ptr.release();
+    db->lock = lock;
 
     req->error = nullptr;
   } else {
     db->handle = nullptr;
+    db->lock = -1;
 
     req->error = strdup(status.getState());
+
+    if (lock >= 0) {
+      uv_fs_t fs;
+      err = uv_fs_close(NULL, &fs, lock, NULL);
+      assert(err == 0);
+
+      uv_fs_req_cleanup(&fs);
+    }
   }
 }
 
@@ -518,6 +542,8 @@ rocksdb__on_after_close(uv_work_t *handle, int status) {
 
 static void
 rocksdb__on_close(uv_work_t *handle) {
+  int err;
+
   auto req = reinterpret_cast<rocksdb_close_t *>(handle->data);
 
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
@@ -535,6 +561,16 @@ rocksdb__on_close(uv_work_t *handle) {
 
     delete db;
     delete env;
+
+    auto lock = req->req.db->lock;
+
+    if (lock >= 0) {
+      uv_fs_t fs;
+      err = uv_fs_close(NULL, &fs, lock, NULL);
+      assert(err == 0);
+
+      uv_fs_req_cleanup(&fs);
+    }
   }
 }
 
@@ -604,6 +640,8 @@ rocksdb__on_suspend(uv_work_t *handle) {
 
   auto req = reinterpret_cast<rocksdb_suspend_t *>(handle->data);
 
+  auto lock = req->req.db->lock;
+
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
   auto fs = static_cast<rocksdb_file_system_t *>(db->GetFileSystem());
@@ -612,6 +650,8 @@ rocksdb__on_suspend(uv_work_t *handle) {
 
   if (status.ok()) {
     fs->suspend();
+
+    if (lock >= 0) rocksdb__unlock(lock);
 
     req->error = nullptr;
   } else {
@@ -667,6 +707,10 @@ rocksdb__on_resume(uv_work_t *handle) {
   int err;
 
   auto req = reinterpret_cast<rocksdb_resume_t *>(handle->data);
+
+  auto lock = req->req.db->lock;
+
+  if (lock >= 0) rocksdb__lock(lock);
 
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
