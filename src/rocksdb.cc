@@ -1073,11 +1073,7 @@ rocksdb__on_after_iterator_close(uv_work_t *handle, int status) {
 
   req->inflight = false;
 
-  auto error = req->error;
-
   req->cb(req, status);
-
-  if (error) free(error);
 }
 
 static void
