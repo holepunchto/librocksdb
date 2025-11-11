@@ -1010,8 +1010,6 @@ static void
 rocksdb__on_after_iterator_open(uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
 
-  rocksdb__remove_req(req);
-
   req->inflight = false;
 
   auto error = req->error;
@@ -1103,8 +1101,6 @@ rocksdb_iterator_close(rocksdb_iterator_t *req, rocksdb_iterator_cb cb) {
   req->error = nullptr;
   req->cb = cb;
 
-  rocksdb__add_req(req);
-
   return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_iterator_close, rocksdb__on_after_iterator_close);
 }
 
@@ -1113,8 +1109,6 @@ namespace {
 static void
 rocksdb__on_after_iterator_refresh(uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
-
-  rocksdb__remove_req(req);
 
   req->inflight = false;
 
@@ -1158,8 +1152,6 @@ rocksdb_iterator_refresh(rocksdb_iterator_t *req, rocksdb_range_t range, const r
   req->error = nullptr;
   req->cb = cb;
 
-  rocksdb__add_req(req);
-
   return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_iterator_close, rocksdb__on_after_iterator_refresh);
 }
 
@@ -1168,8 +1160,6 @@ namespace {
 static void
 rocksdb__on_after_iterator_read(uv_work_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_iterator_t *>(handle->data);
-
-  rocksdb__remove_req(req);
 
   req->inflight = false;
 
@@ -1214,8 +1204,6 @@ rocksdb_iterator_read(rocksdb_iterator_t *req, rocksdb_slice_t *keys, rocksdb_sl
   req->inflight = true;
   req->error = nullptr;
   req->cb = cb;
-
-  rocksdb__add_req(req);
 
   return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_iterator_read, rocksdb__on_after_iterator_read);
 }
