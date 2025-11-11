@@ -1015,6 +1015,7 @@ rocksdb__on_after_iterator_open(uv_work_t *handle, int status) {
   auto error = req->error;
 
   if (error == nullptr) req->state = rocksdb_active;
+  else rocksdb__remove_req(req);
 
   req->cb(req, status);
 
