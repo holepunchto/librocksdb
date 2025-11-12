@@ -40,6 +40,7 @@ typedef struct rocksdb_compact_range_s rocksdb_compact_range_t;
 typedef struct rocksdb_approximate_size_s rocksdb_approximate_size_t;
 typedef struct rocksdb_s rocksdb_t;
 
+typedef void (*rocksdb_idle_cb)(rocksdb_t *db);
 typedef void (*rocksdb_open_cb)(rocksdb_open_t *req, int status);
 typedef void (*rocksdb_close_cb)(rocksdb_close_t *req, int status);
 typedef void (*rocksdb_suspend_cb)(rocksdb_suspend_t *req, int status);
@@ -507,6 +508,8 @@ struct rocksdb_s {
   int inflight;
   int lock;
 
+  rocksdb_idle_cb idle;
+
   rocksdb_close_t *close;
 };
 
@@ -514,10 +517,10 @@ int
 rocksdb_init(uv_loop_t *loop, rocksdb_t *db);
 
 int
-rocksdb_open(rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_open_cb cb);
+rocksdb_open(rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_idle_cb idle, rocksdb_open_cb cb);
 
 int
-rocksdb_close(rocksdb_t *db, rocksdb_close_t *req, rocksdb_close_cb cb);
+rocksdb_close(rocksdb_t *db, rocksdb_close_t *req, rocksdb_idle_cb idle, rocksdb_close_cb cb);
 
 int
 rocksdb_suspend(rocksdb_t *db, rocksdb_suspend_t *req, rocksdb_suspend_cb cb);
