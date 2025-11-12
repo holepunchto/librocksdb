@@ -45,7 +45,7 @@ on_read(rocksdb_read_batch_t *req, int status) {
   assert(e == 0);
 
   static rocksdb_close_t close;
-  e = rocksdb_close(&db, &close, on_close);
+  e = rocksdb_close(&db, &close, NULL, on_close);
   assert(e == 0);
 }
 
@@ -139,7 +139,7 @@ main() {
   rocksdb_column_family_descriptor_t descriptor = rocksdb_column_family_descriptor("default", NULL);
 
   static rocksdb_open_t open;
-  e = rocksdb_open(&db, &open, "test/fixtures/delete-range.db", &options, &descriptor, &family, 1, on_open);
+  e = rocksdb_open(&db, &open, "test/fixtures/delete-range.db", &options, &descriptor, &family, 1, NULL, on_open);
   assert(e == 0);
 
   e = uv_run(loop, UV_RUN_DEFAULT);

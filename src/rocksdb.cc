@@ -189,6 +189,7 @@ rocksdb_init(uv_loop_t *loop, rocksdb_t *db) {
   db->state = 0;
   db->inflight = 0;
   db->lock = -1;
+  db->idle = nullptr;
   db->close = nullptr;
 
   return 0;
@@ -217,6 +218,8 @@ rocksdb__add_req(T *req) {
 static inline void
 rocksdb__remove_req(rocksdb_t *db, rocksdb_req_t *req) {
   db->inflight--;
+
+  if (db->inflight == 0 && db->idle) db->idle(db);
 
   rocksdb__close_maybe(db);
 }
@@ -507,7 +510,9 @@ rocksdb__on_open(uv_work_t *handle) {
 } // namespace
 
 extern "C" int
-rocksdb_open(rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_open_cb cb) {
+rocksdb_open(rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_idle_cb idle, rocksdb_open_cb cb) {
+  db->idle = idle;
+
   req->req.db = db;
   req->options = options ? *options : rocksdb__default_options;
   req->column_families = column_families;
@@ -577,8 +582,9 @@ rocksdb__on_close(uv_work_t *handle) {
 } // namespace
 
 extern "C" int
-rocksdb_close(rocksdb_t *db, rocksdb_close_t *req, rocksdb_close_cb cb) {
+rocksdb_close(rocksdb_t *db, rocksdb_close_t *req, rocksdb_idle_cb idle, rocksdb_close_cb cb) {
   db->state = rocksdb_closing;
+  db->idle = idle;
 
   req->req.db = db;
   req->error = nullptr;
