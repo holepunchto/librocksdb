@@ -132,9 +132,6 @@ main() {
 
   loop = uv_default_loop();
 
-  e = rocksdb_init(loop, &db);
-  assert(e == 0);
-
   rocksdb_options_t options = {
     .create_if_missing = true,
   };
@@ -142,7 +139,7 @@ main() {
   rocksdb_column_family_descriptor_t descriptor = rocksdb_column_family_descriptor("default", NULL);
 
   static rocksdb_open_t open;
-  e = rocksdb_open(&db, &open, "test/fixtures/delete-range-and-end.db", &options, &descriptor, &family, 1, NULL, on_open);
+  e = rocksdb_open(loop, &db, &open, "test/fixtures/delete-range-and-end.db", &options, &descriptor, &family, 1, NULL, on_open);
   assert(e == 0);
 
   e = uv_run(loop, UV_RUN_DEFAULT);
