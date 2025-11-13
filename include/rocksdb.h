@@ -354,7 +354,10 @@ struct rocksdb_iterator_s {
 
   char *error;
 
-  rocksdb_iterator_cb cb;
+  rocksdb_iterator_cb open;
+  rocksdb_iterator_cb close;
+  rocksdb_iterator_cb refresh;
+  rocksdb_iterator_cb read;
 
   void *data;
 };
@@ -514,10 +517,7 @@ struct rocksdb_s {
 };
 
 int
-rocksdb_init(uv_loop_t *loop, rocksdb_t *db);
-
-int
-rocksdb_open(rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_idle_cb idle, rocksdb_open_cb cb);
+rocksdb_open(uv_loop_t *loop, rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_idle_cb idle, rocksdb_open_cb cb);
 
 int
 rocksdb_close(rocksdb_t *db, rocksdb_close_t *req, rocksdb_idle_cb idle, rocksdb_close_cb cb);
