@@ -206,8 +206,6 @@ static inline int
 rocksdb__remove_req(rocksdb_t *db, rocksdb_req_t *req) {
   db->inflight--;
 
-  if (db->inflight == 0 && db->idle) db->idle(db);
-
   return rocksdb__close_maybe(db);
 }
 
@@ -598,6 +596,8 @@ namespace {
 
 static inline int
 rocksdb__close_maybe(rocksdb_t *db) {
+  if (db->inflight == 0 && db->idle) db->idle(db);
+
   if (db->inflight > 0 || db->state != rocksdb_closing) return 0;
 
   auto req = db->close;
