@@ -259,6 +259,7 @@ struct rocksdb_compact_range_options_s {
   /** @since 1 */
   double blob_garbage_collection_age_cutoff;
 
+  /** @since 1 */
   rocksdb_bottommost_level_compaction_t bottommost_level_compaction;
 };
 
