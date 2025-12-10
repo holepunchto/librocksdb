@@ -71,6 +71,20 @@ rocksdb__from(rocksdb_blob_garbage_collection_policy_t policy) {
   }
 }
 
+static inline BottommostLevelCompaction
+rocksdb__from(rocksdb_bottommost_level_compaction_t policy) {
+  switch (policy) {
+  case rocksdb_default_bottommost_level_compaction:
+    return BottommostLevelCompaction::kIfHaveCompactionFilter;
+  case rocksdb_skip_bottommost_level_compaction:
+    return BottommostLevelCompaction::kSkip;
+  case rocksdb_force_bottommost_level_compaction:
+    return BottommostLevelCompaction::kForce;
+  default:
+    return BottommostLevelCompaction::kIfHaveCompactionFilter;
+  }
+}
+
 } // namespace
 
 namespace {
@@ -1561,6 +1575,12 @@ rocksdb__on_compact_range(uv_work_t *handle) {
   options.blob_garbage_collection_age_cutoff = rocksdb__option<&rocksdb_compact_range_options_t::blob_garbage_collection_age_cutoff, double>(
     &req->options, 1
   );
+
+  auto bottommost_level_compaction = rocksdb__option<&rocksdb_compact_range_options_t::bottommost_level_compaction, rocksdb_bottommost_level_compaction_t>(
+    &req->options, 1
+  );
+
+  options.bottommost_level_compaction = rocksdb__from(bottommost_level_compaction);
 
   auto status = db->CompactRange(
     options,

@@ -47,7 +47,8 @@ on_write(rocksdb_write_batch_t *req, int status) {
 
   rocksdb_compact_range_options_t options = {
       .blob_garbage_collection_policy = rocksdb_force_blob_garbage_collection_policy,
-      .blob_garbage_collection_age_cutoff = 0.0
+      .blob_garbage_collection_age_cutoff = 0.0,
+      .bottommost_level_compaction = rocksdb_force_bottommost_level_compaction
   };
 
   e = rocksdb_compact_range(&db, &compact_range, family, start, end, &options, on_compact_range);

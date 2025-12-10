@@ -118,6 +118,12 @@ typedef enum {
   rocksdb_disable_blob_garbage_collection_policy = 2,
 } rocksdb_blob_garbage_collection_policy_t;
 
+typedef enum {
+    rocksdb_default_bottommost_level_compaction = 0,
+    rocksdb_skip_bottommost_level_compaction = 1,
+    rocksdb_force_bottommost_level_compaction = 2,
+} rocksdb_bottommost_level_compaction_t;
+
 /** @version 0 */
 struct rocksdb_bloom_filter_options_s {
   int version;
@@ -252,6 +258,8 @@ struct rocksdb_compact_range_options_s {
 
   /** @since 1 */
   double blob_garbage_collection_age_cutoff;
+
+  rocksdb_bottommost_level_compaction_t bottommost_level_compaction;
 };
 
 /** @version 0 */
