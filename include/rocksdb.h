@@ -112,6 +112,12 @@ typedef enum {
   rocksdb_pin_all = 2,
 } rocksdb_pinning_tier_t;
 
+typedef enum {
+  rocksdb_default_blob_garbage_collection_policy = 0,
+  rocksdb_force_blob_garbage_collection_policy = 1,
+  rocksdb_disable_blob_garbage_collection_policy = 2,
+} rocksdb_blob_garbage_collection_policy_t;
+
 /** @version 0 */
 struct rocksdb_bloom_filter_options_s {
   int version;
@@ -234,12 +240,18 @@ struct rocksdb_flush_options_s {
   int version;
 };
 
-/** @version 0 */
+/** @version 1 */
 struct rocksdb_compact_range_options_s {
   int version;
 
   /** @since 0 */
   bool exclusive_manual_compaction;
+
+  /** @since 1 */
+  rocksdb_blob_garbage_collection_policy_t blob_garbage_collection_policy;
+
+  /** @since 1 */
+  double blob_garbage_collection_age_cutoff;
 };
 
 /** @version 0 */

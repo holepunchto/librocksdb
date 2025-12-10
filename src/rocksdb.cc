@@ -57,6 +57,20 @@ rocksdb__from(rocksdb_pinning_tier_t pinning_tier) {
   }
 }
 
+static inline BlobGarbageCollectionPolicy
+rocksdb__from(rocksdb_blob_garbage_collection_policy_t policy) {
+  switch (policy) {
+  case rocksdb_default_blob_garbage_collection_policy:
+    return BlobGarbageCollectionPolicy::kUseDefault;
+  case rocksdb_force_blob_garbage_collection_policy:
+    return BlobGarbageCollectionPolicy::kForce;
+  case rocksdb_disable_blob_garbage_collection_policy:
+    return BlobGarbageCollectionPolicy::kDisable;
+  default:
+    return BlobGarbageCollectionPolicy::kUseDefault;
+  }
+}
+
 } // namespace
 
 namespace {
@@ -1536,6 +1550,16 @@ rocksdb__on_compact_range(uv_work_t *handle) {
 
   options.exclusive_manual_compaction = rocksdb__option<&rocksdb_compact_range_options_t::exclusive_manual_compaction, bool>(
     &req->options, 0
+  );
+
+  auto blob_garbage_collection_policy = rocksdb__option<&rocksdb_compact_range_options_t::blob_garbage_collection_policy, rocksdb_blob_garbage_collection_policy_t>(
+    &req->options, 1
+  );
+
+  options.blob_garbage_collection_policy = rocksdb__from(blob_garbage_collection_policy);
+
+  options.blob_garbage_collection_age_cutoff = rocksdb__option<&rocksdb_compact_range_options_t::blob_garbage_collection_age_cutoff, double>(
+    &req->options, 1
   );
 
   auto status = db->CompactRange(
