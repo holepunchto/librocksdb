@@ -126,6 +126,8 @@ static const rocksdb_column_family_options_t rocksdb__default_column_family_opti
   .optimize_filters_for_hits = false,
   .num_levels = 7,
   .max_write_buffer_number = 2,
+  .blob_garbage_collection_age_cutoff = 0.25,
+  .blob_garbage_collection_force_threshold = 1.0
 };
 
 static const rocksdb_iterator_options_t rocksdb__default_iterator_options = {
@@ -473,6 +475,14 @@ rocksdb__on_open(uv_work_t *handle) {
 
     options.max_write_buffer_number = rocksdb__option<&rocksdb_column_family_options_t::max_write_buffer_number, int>(
       &column_family.options, 4
+    );
+
+    options.blob_garbage_collection_age_cutoff = rocksdb__option<&rocksdb_column_family_options_t::blob_garbage_collection_age_cutoff, double>(
+      &column_family.options, 5
+    );
+
+    options.blob_garbage_collection_force_threshold= rocksdb__option<&rocksdb_column_family_options_t::blob_garbage_collection_force_threshold, double>(
+      &column_family.options, 5
     );
 
     options.table_factory = std::shared_ptr<TableFactory>(NewBlockBasedTableFactory(table_options));

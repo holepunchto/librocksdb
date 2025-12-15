@@ -93,7 +93,12 @@ main() {
     .create_if_missing = true,
   };
 
-  rocksdb_column_family_descriptor_t descriptor = rocksdb_column_family_descriptor("default", NULL);
+  rocksdb_column_family_options_t  column_options = {
+    .blob_garbage_collection_age_cutoff = 0.0,
+    .blob_garbage_collection_force_threshold = 0.0
+  };
+
+  rocksdb_column_family_descriptor_t descriptor = rocksdb_column_family_descriptor("default", &column_options);
 
   static rocksdb_open_t open;
   e = rocksdb_open(loop, &db, &open, "test/fixtures/compact-range.db", &options, &descriptor, &family, 1, NULL, on_open);
