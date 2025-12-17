@@ -61,13 +61,12 @@ static inline BlobGarbageCollectionPolicy
 rocksdb__from(rocksdb_blob_garbage_collection_policy_t policy) {
   switch (policy) {
   case rocksdb_default_blob_garbage_collection_policy:
+  default:
     return BlobGarbageCollectionPolicy::kUseDefault;
   case rocksdb_force_blob_garbage_collection_policy:
     return BlobGarbageCollectionPolicy::kForce;
   case rocksdb_disable_blob_garbage_collection_policy:
     return BlobGarbageCollectionPolicy::kDisable;
-  default:
-    return BlobGarbageCollectionPolicy::kUseDefault;
   }
 }
 
@@ -75,13 +74,12 @@ static inline BottommostLevelCompaction
 rocksdb__from(rocksdb_bottommost_level_compaction_t policy) {
   switch (policy) {
   case rocksdb_default_bottommost_level_compaction:
+  default:
     return BottommostLevelCompaction::kIfHaveCompactionFilter;
   case rocksdb_skip_bottommost_level_compaction:
     return BottommostLevelCompaction::kSkip;
   case rocksdb_force_bottommost_level_compaction:
     return BottommostLevelCompaction::kForce;
-  default:
-    return BottommostLevelCompaction::kIfHaveCompactionFilter;
   }
 }
 
@@ -106,7 +104,7 @@ static const rocksdb_options_t rocksdb__default_options = {
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
-  .version = 3,
+  .version = 5,
   .compaction_style = rocksdb_level_compaction,
   .enable_blob_files = false,
   .min_blob_size = 0,
@@ -153,8 +151,11 @@ static const rocksdb_flush_options_t rocksdb__default_flush_options = {
 };
 
 static const rocksdb_compact_range_options_t rocksdb__default_compact_range_options = {
-  .version = 0,
+  .version = 1,
   .exclusive_manual_compaction = true,
+  .blob_garbage_collection_policy = rocksdb_default_blob_garbage_collection_policy,
+  .blob_garbage_collection_age_cutoff = 0.25,
+  .bottommost_level_compaction = rocksdb_default_bottommost_level_compaction
 };
 
 static const rocksdb_approximate_size_options_t rocksdb__default_approximate_size_options = {
