@@ -119,9 +119,9 @@ typedef enum {
 } rocksdb_blob_garbage_collection_policy_t;
 
 typedef enum {
-    rocksdb_default_bottommost_level_compaction = 0,
-    rocksdb_skip_bottommost_level_compaction = 1,
-    rocksdb_force_bottommost_level_compaction = 2,
+  rocksdb_default_bottommost_level_compaction = 0,
+  rocksdb_skip_bottommost_level_compaction = 1,
+  rocksdb_force_bottommost_level_compaction = 2,
 } rocksdb_bottommost_level_compaction_t;
 
 /** @version 0 */
