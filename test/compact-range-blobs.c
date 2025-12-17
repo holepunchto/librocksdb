@@ -1,6 +1,5 @@
 #include <assert.h>
 #include <stdbool.h>
-#include <string.h>
 #include <uv.h>
 
 #include "../include/rocksdb.h"
@@ -46,7 +45,13 @@ on_write(rocksdb_write_batch_t *req, int status) {
   rocksdb_slice_t start = rocksdb_slice_init("b", 2);
   rocksdb_slice_t end = rocksdb_slice_init("e", 2);
 
-  e = rocksdb_compact_range(&db, &compact_range, family, start, end, NULL, on_compact_range);
+  rocksdb_compact_range_options_t options = {
+      .blob_garbage_collection_policy = rocksdb_force_blob_garbage_collection_policy,
+      .blob_garbage_collection_age_cutoff = 0.0,
+      .bottommost_level_compaction = rocksdb_force_bottommost_level_compaction
+  };
+
+  e = rocksdb_compact_range(&db, &compact_range, family, start, end, &options, on_compact_range);
   assert(e == 0);
 }
 
@@ -88,12 +93,9 @@ main() {
     .create_if_missing = true,
   };
 
-  rocksdb_column_family_options_t column_options = {
-    .blob_garbage_collection_age_cutoff = 0.0,
-    .blob_garbage_collection_force_threshold = 0.0
-  };
-
-  rocksdb_column_family_descriptor_t descriptor = rocksdb_column_family_descriptor("default", &column_options);
+  rocksdb_column_family_descriptor_t descriptor = rocksdb_column_family_descriptor("default", NULL);
+  descriptor.options.blob_garbage_collection_age_cutoff = 0.0;
+  descriptor.options.blob_garbage_collection_force_threshold = 0.0;
 
   static rocksdb_open_t open;
   e = rocksdb_open(loop, &db, &open, "test/fixtures/compact-range.db", &options, &descriptor, &family, 1, NULL, on_open);
