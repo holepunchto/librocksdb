@@ -482,7 +482,7 @@ rocksdb__on_open(uv_work_t *handle) {
       &column_family.options, 5
     );
 
-    options.blob_garbage_collection_force_threshold= rocksdb__option<&rocksdb_column_family_options_t::blob_garbage_collection_force_threshold, double>(
+    options.blob_garbage_collection_force_threshold = rocksdb__option<&rocksdb_column_family_options_t::blob_garbage_collection_force_threshold, double>(
       &column_family.options, 5
     );
 
