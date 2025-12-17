@@ -93,7 +93,7 @@ main() {
     .create_if_missing = true,
   };
 
-  rocksdb_column_family_options_t  column_options = {
+  rocksdb_column_family_options_t column_options = {
     .blob_garbage_collection_age_cutoff = 0.0,
     .blob_garbage_collection_force_threshold = 0.0
   };
