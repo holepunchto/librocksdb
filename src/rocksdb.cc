@@ -57,6 +57,32 @@ rocksdb__from(rocksdb_pinning_tier_t pinning_tier) {
   }
 }
 
+static inline BlobGarbageCollectionPolicy
+rocksdb__from(rocksdb_blob_garbage_collection_policy_t policy) {
+  switch (policy) {
+  case rocksdb_default_blob_garbage_collection_policy:
+  default:
+    return BlobGarbageCollectionPolicy::kUseDefault;
+  case rocksdb_force_blob_garbage_collection_policy:
+    return BlobGarbageCollectionPolicy::kForce;
+  case rocksdb_disable_blob_garbage_collection_policy:
+    return BlobGarbageCollectionPolicy::kDisable;
+  }
+}
+
+static inline BottommostLevelCompaction
+rocksdb__from(rocksdb_bottommost_level_compaction_t policy) {
+  switch (policy) {
+  case rocksdb_default_bottommost_level_compaction:
+  default:
+    return BottommostLevelCompaction::kIfHaveCompactionFilter;
+  case rocksdb_skip_bottommost_level_compaction:
+    return BottommostLevelCompaction::kSkip;
+  case rocksdb_force_bottommost_level_compaction:
+    return BottommostLevelCompaction::kForce;
+  }
+}
+
 } // namespace
 
 namespace {
@@ -78,7 +104,7 @@ static const rocksdb_options_t rocksdb__default_options = {
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
-  .version = 3,
+  .version = 5,
   .compaction_style = rocksdb_level_compaction,
   .enable_blob_files = false,
   .min_blob_size = 0,
@@ -98,6 +124,8 @@ static const rocksdb_column_family_options_t rocksdb__default_column_family_opti
   .optimize_filters_for_hits = false,
   .num_levels = 7,
   .max_write_buffer_number = 2,
+  .blob_garbage_collection_age_cutoff = 0.25,
+  .blob_garbage_collection_force_threshold = 1.0
 };
 
 static const rocksdb_iterator_options_t rocksdb__default_iterator_options = {
@@ -123,8 +151,11 @@ static const rocksdb_flush_options_t rocksdb__default_flush_options = {
 };
 
 static const rocksdb_compact_range_options_t rocksdb__default_compact_range_options = {
-  .version = 0,
+  .version = 1,
   .exclusive_manual_compaction = true,
+  .blob_garbage_collection_policy = rocksdb_default_blob_garbage_collection_policy,
+  .blob_garbage_collection_age_cutoff = 0.25,
+  .bottommost_level_compaction = rocksdb_default_bottommost_level_compaction
 };
 
 static const rocksdb_approximate_size_options_t rocksdb__default_approximate_size_options = {
@@ -445,6 +476,14 @@ rocksdb__on_open(uv_work_t *handle) {
 
     options.max_write_buffer_number = rocksdb__option<&rocksdb_column_family_options_t::max_write_buffer_number, int>(
       &column_family.options, 4
+    );
+
+    options.blob_garbage_collection_age_cutoff = rocksdb__option<&rocksdb_column_family_options_t::blob_garbage_collection_age_cutoff, double>(
+      &column_family.options, 5
+    );
+
+    options.blob_garbage_collection_force_threshold = rocksdb__option<&rocksdb_column_family_options_t::blob_garbage_collection_force_threshold, double>(
+      &column_family.options, 5
     );
 
     options.table_factory = std::shared_ptr<TableFactory>(NewBlockBasedTableFactory(table_options));
@@ -1537,6 +1576,22 @@ rocksdb__on_compact_range(uv_work_t *handle) {
   options.exclusive_manual_compaction = rocksdb__option<&rocksdb_compact_range_options_t::exclusive_manual_compaction, bool>(
     &req->options, 0
   );
+
+  auto blob_garbage_collection_policy = rocksdb__option<&rocksdb_compact_range_options_t::blob_garbage_collection_policy, rocksdb_blob_garbage_collection_policy_t>(
+    &req->options, 1
+  );
+
+  options.blob_garbage_collection_policy = rocksdb__from(blob_garbage_collection_policy);
+
+  options.blob_garbage_collection_age_cutoff = rocksdb__option<&rocksdb_compact_range_options_t::blob_garbage_collection_age_cutoff, double>(
+    &req->options, 1
+  );
+
+  auto bottommost_level_compaction = rocksdb__option<&rocksdb_compact_range_options_t::bottommost_level_compaction, rocksdb_bottommost_level_compaction_t>(
+    &req->options, 1
+  );
+
+  options.bottommost_level_compaction = rocksdb__from(bottommost_level_compaction);
 
   auto status = db->CompactRange(
     options,
