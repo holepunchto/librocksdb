@@ -507,15 +507,15 @@ rocksdb__on_open(uv_work_t *handle) {
     status = DB::Open(options, req->path, column_families, &handles, &ptr);
   }
 
-  for (size_t i = 0, n = req->len; i < n; i++) {
-    req->handles[i] = reinterpret_cast<rocksdb_column_family_t *>(handles[i]);
-  }
-
   auto db = req->req.db;
 
   if (status.ok()) {
     db->handle = ptr.release();
     db->lock = lock;
+
+    for (size_t i = 0, n = req->len; i < n; i++) {
+      req->handles[i] = reinterpret_cast<rocksdb_column_family_t *>(handles[i]);
+    }
 
     req->error = nullptr;
   } else {
