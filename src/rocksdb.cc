@@ -14,14 +14,8 @@
 
 #include "../include/rocksdb.h"
 #include "fs.h"
-
-#if defined(__APPLE__)
-#include "lock/apple.h"
-#elif defined(__linux__)
-#include "lock/linux.h"
-#elif defined(_WIN32)
-#include "lock/win32.h"
-#endif
+#include "lock.h"
+#include "xattr.h"
 
 using namespace rocksdb;
 
@@ -550,11 +544,8 @@ rocksdb__on_open(uv_work_t *handle) {
 
       uv_buf_t buf = uv_buf_init((char *) db->id, sizeof(db->id));
 
-      uv_fs_t fs;
-      err = uv_fs_write(NULL, &fs, lock, &buf, 1, 0, NULL);
-      assert(err == sizeof(db->id));
-
-      uv_fs_req_cleanup(&fs);
+      err = rocksdb__set_xattr(lock, "rocksdb-lock", &buf);
+      assert(err == 0);
     }
   } else {
     db->handle = nullptr;
@@ -794,19 +785,11 @@ rocksdb__on_resume(uv_work_t *handle) {
     rocksdb__lock(lock);
 
     if (!read_only) {
-      char base[16];
+      uv_buf_t buf;
+      err = rocksdb__get_xattr(lock, "rocksdb-lock", &buf);
+      assert(err == 0);
 
-      uv_buf_t buf = uv_buf_init(base, sizeof(base));
-
-      uv_fs_t fs;
-      err = uv_fs_read(NULL, &fs, lock, &buf, 1, 0, NULL);
-      assert(err >= 0);
-
-      uv_fs_req_cleanup(&fs);
-
-      int len = err;
-
-      if (len != 16 || memcmp(id, buf.base, buf.len) != 0) {
+      if (buf.len != 16 || memcmp(id, buf.base, buf.len) != 0) {
         rocksdb__unlock(lock);
 
         req->error = strdup("Lock file ID does not match");
