@@ -52,6 +52,13 @@ typedef void (*rocksdb_flush_cb)(rocksdb_flush_t *req, int status);
 typedef void (*rocksdb_compact_range_cb)(rocksdb_compact_range_t *req, int status);
 typedef void (*rocksdb_approximate_size_cb)(rocksdb_approximate_size_t *req, int status);
 
+typedef enum {
+  rocksdb_tolerate_corrupted_tail_records_recovery_mode = 0,
+  rocksdb_absolute_consistency_recovery_mode = 1,
+  rocksdb_point_in_time_recovery_mode = 2,
+  rocksdb_skip_any_corrupted_records_recovery_mode = 3,
+} rocksdb_wal_recovery_mode_t;
+
 /** @version 3 */
 struct rocksdb_options_s {
   int version;
@@ -91,6 +98,9 @@ struct rocksdb_options_s {
 
   /** @since 3 */
   int lock;
+
+  /** @since 4 */
+  rocksdb_wal_recovery_mode_t wal_recovery_mode;
 };
 
 typedef enum {
