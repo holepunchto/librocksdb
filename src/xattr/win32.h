@@ -2,9 +2,7 @@
 
 #include <uv.h>
 
-#include <ntddk.h>
 #include <ntifs.h>
-#include <wdm.h>
 
 namespace {
 
