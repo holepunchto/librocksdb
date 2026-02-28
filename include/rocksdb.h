@@ -548,6 +548,10 @@ struct rocksdb_s {
   int inflight;
   int lock;
 
+  bool read_only;
+
+  uint8_t id[16];
+
   rocksdb_idle_cb idle;
 
   rocksdb_close_t *close;

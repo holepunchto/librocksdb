@@ -531,6 +531,8 @@ rocksdb__on_open(uv_work_t *handle) {
 
   auto db = req->req.db;
 
+  db->read_only = read_only;
+
   if (status.ok()) {
     db->handle = ptr.release();
     db->lock = lock;
@@ -540,6 +542,20 @@ rocksdb__on_open(uv_work_t *handle) {
     }
 
     req->error = nullptr;
+
+    if (lock >= 0 && !read_only) {
+      uv_random_t rand;
+      err = uv_random(NULL, &rand, db->id, sizeof(db->id), 0, NULL);
+      assert(err == 0);
+
+      uv_buf_t buf = uv_buf_init((char *) db->id, sizeof(db->id));
+
+      uv_fs_t fs;
+      err = uv_fs_write(NULL, &fs, lock, &buf, 1, 0, NULL);
+      assert(err == 0);
+
+      uv_fs_req_cleanup(&fs);
+    }
   } else {
     db->handle = nullptr;
     db->lock = -1;
@@ -771,8 +787,32 @@ rocksdb__on_resume(uv_work_t *handle) {
   auto req = reinterpret_cast<rocksdb_resume_t *>(handle->data);
 
   auto lock = req->req.db->lock;
+  auto read_only = req->req.db->read_only;
+  auto id = req->req.db->id;
 
-  if (lock >= 0) rocksdb__lock(lock);
+  if (lock >= 0) {
+    rocksdb__lock(lock);
+
+    if (!read_only) {
+      uv_buf_t buf;
+
+      uv_fs_t fs;
+      err = uv_fs_read(NULL, &fs, lock, &buf, 1, 0, NULL);
+      assert(err >= 0);
+
+      uv_fs_req_cleanup(&fs);
+
+      int len = err;
+
+      if (len != 16 || memcmp(id, buf.base, buf.len) != 0) {
+        rocksdb__unlock(lock);
+
+        req->error = strdup("Lock file ID does not match");
+
+        return;
+      }
+    }
+  }
 
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
@@ -788,9 +828,13 @@ rocksdb__on_resume(uv_work_t *handle) {
     } else {
       fs->suspend();
 
+      if (lock >= 0) rocksdb__unlock(lock);
+
       req->error = strdup(status.getState());
     }
   } else {
+    if (lock >= 0) rocksdb__unlock(lock);
+
     req->error = strdup(status.getState());
   }
 }
