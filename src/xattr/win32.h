@@ -2,7 +2,7 @@
 
 #include <uv.h>
 
-#include <ntifs.h>
+#include "../nt.h"
 
 namespace {
 
