@@ -552,7 +552,7 @@ rocksdb__on_open(uv_work_t *handle) {
 
       uv_fs_t fs;
       err = uv_fs_write(NULL, &fs, lock, &buf, 1, 0, NULL);
-      assert(err == 0);
+      assert(err == sizeof(db->id));
 
       uv_fs_req_cleanup(&fs);
     }
@@ -794,7 +794,9 @@ rocksdb__on_resume(uv_work_t *handle) {
     rocksdb__lock(lock);
 
     if (!read_only) {
-      uv_buf_t buf;
+      char base[16];
+
+      uv_buf_t buf = uv_buf_init(base, sizeof(base));
 
       uv_fs_t fs;
       err = uv_fs_read(NULL, &fs, lock, &buf, 1, 0, NULL);
