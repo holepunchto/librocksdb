@@ -29,6 +29,21 @@ static_assert(sizeof(Slice) == sizeof(rocksdb_slice_t));
 
 namespace {
 
+static inline WALRecoveryMode
+rocksdb__from(rocksdb_wal_recovery_mode_t recovery_mode) {
+  switch (recovery_mode) {
+  case rocksdb_tolerate_corrupted_tail_records_recovery_mode:
+    return WALRecoveryMode::kTolerateCorruptedTailRecords;
+  case rocksdb_absolute_consistency_recovery_mode:
+    return WALRecoveryMode::kAbsoluteConsistency;
+  case rocksdb_point_in_time_recovery_mode:
+  default:
+    return WALRecoveryMode::kPointInTimeRecovery;
+  case rocksdb_skip_any_corrupted_records_recovery_mode:
+    return WALRecoveryMode::kSkipAnyCorruptedRecords;
+  }
+}
+
 static inline CompactionStyle
 rocksdb__from(rocksdb_compaction_style_t compaction_style) {
   switch (compaction_style) {
@@ -88,7 +103,7 @@ rocksdb__from(rocksdb_bottommost_level_compaction_t policy) {
 namespace {
 
 static const rocksdb_options_t rocksdb__default_options = {
-  .version = 3,
+  .version = 4,
   .read_only = false,
   .create_if_missing = false,
   .create_missing_column_families = false,
@@ -101,6 +116,7 @@ static const rocksdb_options_t rocksdb__default_options = {
   .use_direct_io_for_flush_and_compaction = false,
   .max_file_opening_threads = 16,
   .lock = -1,
+  .wal_recovery_mode = rocksdb_point_in_time_recovery_mode,
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
@@ -323,6 +339,12 @@ rocksdb__on_open(uv_work_t *handle) {
   auto lock = rocksdb__option<&rocksdb_options_t::lock, int>(
     &req->options, 3
   );
+
+  auto wal_recovery_mode = rocksdb__option<&rocksdb_options_t::wal_recovery_mode, rocksdb_wal_recovery_mode_t>(
+    &req->options, 4
+  );
+
+  options.wal_recovery_mode = rocksdb__from(wal_recovery_mode);
 
   auto read_only = rocksdb__option<&rocksdb_options_t::read_only, bool>(
     &req->options, 0
