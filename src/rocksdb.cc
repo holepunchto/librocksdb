@@ -839,7 +839,7 @@ rocksdb__on_resume(uv_work_t *handle) {
     }
 
     if (memcmp(req->req.db->id, base, sizeof(base)) != 0) {
-      rocksdb__unlock(lock);
+      if (lock >= 0) rocksdb__unlock(lock);
 
       req->error = strdup("Lock file ID does not match");
 
