@@ -58,7 +58,6 @@ target_sources(
     include/rocksdb.h
   PRIVATE
     src/fs.h
-    src/nt.h
     src/lock.h
     src/lock/apple.h
     src/lock/linux.h
@@ -91,12 +90,6 @@ if(WIN32)
     rocksdb
     PUBLIC
       /GR-
-  )
-
-  target_link_libraries(
-    rocksdb
-    PUBLIC
-      ntdll
   )
 else()
   target_compile_options(
