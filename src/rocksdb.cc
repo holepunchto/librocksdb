@@ -1,7 +1,6 @@
 #include <memory>
 #include <vector>
 
-#include <path.h>
 #include <rocksdb/advanced_options.h>
 #include <rocksdb/convenience.h>
 #include <rocksdb/db.h>
@@ -351,11 +350,13 @@ rocksdb__on_open(uv_work_t *handle) {
   );
 
   if (options.create_if_missing) {
-    char *path = strdup(req->path);
+    std::string path(req->path);
+
+    auto end = path.size();
 
     while (true) {
       uv_fs_t fs;
-      err = uv_fs_mkdir(NULL, &fs, path, 0775, NULL);
+      err = uv_fs_mkdir(NULL, &fs, path.substr(0, end).c_str(), 0775, NULL);
 
       uv_fs_req_cleanup(&fs);
 
@@ -369,31 +370,28 @@ rocksdb__on_open(uv_work_t *handle) {
 
       case UV_EEXIST:
       case 0: {
-        size_t len = strlen(path);
+        if (end == path.size()) goto done;
 
-        if (len == strlen(req->path)) goto done;
+        auto i = path.find_first_of("/\\", end + 1);
 
-        path[len] = '/';
+        end = (i != std::string::npos) ? i : path.size();
 
         continue;
       }
 
       case UV_ENOENT: {
-        size_t dirname;
-        err = path_dirname(path, &dirname, path_behavior_system);
-        assert(err == 0);
+        auto i = path.find_last_of("/\\", end - 1);
 
-        if (dirname == strlen(req->path)) goto done;
+        if (i == std::string::npos || i == 0) goto done;
 
-        path[dirname - 1] = '\0';
+        end = i;
 
         continue;
       }
       }
     }
 
-  done:
-    free(path);
+  done:;
   }
 
   auto column_families = std::vector<ColumnFamilyDescriptor>(req->len);

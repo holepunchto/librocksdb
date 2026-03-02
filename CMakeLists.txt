@@ -24,8 +24,6 @@ set(ARTIFACT_SUFFIX _facebook) # Ensure that upstream RocksDB targets don't clas
 
 fetch_package("github:libuv/libuv@1.51.0")
 
-fetch_package("github:holepunchto/libpath")
-
 fetch_package(
   "github:facebook/rocksdb@10.5.1"
   SOURCE_DIR rocksdb_dir
@@ -76,8 +74,6 @@ target_link_libraries(
   rocksdb
   PRIVATE
     rocksdb_facebook
-  PUBLIC
-    path
 )
 
 if(WIN32)
@@ -110,7 +106,6 @@ target_link_libraries(
     rocksdb
   PRIVATE
     rocksdb_facebook
-    path_shared
 )
 
 add_library(rocksdb_static STATIC)
@@ -129,7 +124,6 @@ target_link_libraries(
     rocksdb
   PRIVATE
     rocksdb_facebook
-    path_static
 )
 
 install(TARGETS rocksdb_shared rocksdb_static)
