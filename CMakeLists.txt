@@ -58,14 +58,9 @@ target_sources(
     include/rocksdb.h
   PRIVATE
     src/fs.h
-    src/lock.h
     src/lock/apple.h
     src/lock/linux.h
     src/lock/win32.h
-    src/xattr.h
-    src/xattr/apple.h
-    src/xattr/linux.h
-    src/xattr/win32.h
     src/rocksdb.cc
 )
 
