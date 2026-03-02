@@ -550,7 +550,7 @@ struct rocksdb_s {
 
   bool read_only;
 
-  uint8_t id[16];
+  char id[20];
 
   rocksdb_idle_cb idle;
 

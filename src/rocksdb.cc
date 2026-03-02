@@ -543,18 +543,39 @@ rocksdb__on_open(uv_work_t *handle) {
 
     req->error = nullptr;
 
-    if (lock >= 0 && !read_only) {
-      uv_random_t rand;
-      err = uv_random(NULL, &rand, db->id, sizeof(db->id), 0, NULL);
-      assert(err == 0);
+    if (!read_only) {
+      auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
-      uv_buf_t buf = uv_buf_init((char *) db->id, sizeof(db->id));
+      std::string id;
+      status = db->GetDbSessionId(id);
+      assert(status.ok());
+
+      assert(id.size() == 20);
+
+      memcpy(req->req.db->id, id.data(), id.size());
+
+      auto path = db->GetName() + "/SESSION_ID";
 
       uv_fs_t fs;
-      err = uv_fs_write(NULL, &fs, lock, &buf, 1, 0, NULL);
-      assert(err == sizeof(db->id));
+      err = uv_fs_open(NULL, &fs, path.c_str(), UV_FS_O_WRONLY | UV_FS_O_CREAT | UV_FS_O_TRUNC, 0644, NULL);
 
       uv_fs_req_cleanup(&fs);
+
+      if (err >= 0) {
+        int fd = err;
+
+        auto buf = uv_buf_init(id.data(), id.size());
+
+        err = uv_fs_write(NULL, &fs, fd, &buf, 1, 0, NULL);
+        assert(err == buf.len);
+
+        uv_fs_req_cleanup(&fs);
+
+        err = uv_fs_close(NULL, &fs, fd, NULL);
+        assert(err == 0);
+
+        uv_fs_req_cleanup(&fs);
+      }
     }
   } else {
     db->handle = nullptr;
@@ -788,31 +809,41 @@ rocksdb__on_resume(uv_work_t *handle) {
 
   auto lock = req->req.db->lock;
   auto read_only = req->req.db->read_only;
-  auto id = req->req.db->id;
 
-  if (lock >= 0) {
-    rocksdb__lock(lock);
+  if (lock >= 0) rocksdb__lock(lock);
 
-    if (!read_only) {
-      char base[16];
+  if (!read_only) {
+    auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
-      uv_buf_t buf = uv_buf_init(base, sizeof(base));
+    auto path = db->GetName() + "/SESSION_ID";
 
-      uv_fs_t fs;
-      err = uv_fs_read(NULL, &fs, lock, &buf, 1, 0, NULL);
-      assert(err >= 0);
+    uv_fs_t fs;
+    err = uv_fs_open(NULL, &fs, path.c_str(), UV_FS_O_RDONLY, 0, NULL);
+
+    uv_fs_req_cleanup(&fs);
+
+    char base[20] = {0};
+
+    auto buf = uv_buf_init(base, sizeof(base));
+
+    if (err >= 0) {
+      int fd = err;
+      err = uv_fs_read(NULL, &fs, fd, &buf, 1, 0, NULL);
 
       uv_fs_req_cleanup(&fs);
 
-      int len = err;
+      err = uv_fs_close(NULL, &fs, fd, NULL);
+      assert(err == 0);
 
-      if (len != 16 || memcmp(id, buf.base, buf.len) != 0) {
-        rocksdb__unlock(lock);
+      uv_fs_req_cleanup(&fs);
+    }
 
-        req->error = strdup("Lock file ID does not match");
+    if (memcmp(req->req.db->id, base, sizeof(base)) != 0) {
+      rocksdb__unlock(lock);
 
-        return;
-      }
+      req->error = strdup("Lock file ID does not match");
+
+      return;
     }
   }
 
