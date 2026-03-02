@@ -1,7 +1,6 @@
 #include <memory>
 #include <vector>
 
-#include <path.h>
 #include <rocksdb/advanced_options.h>
 #include <rocksdb/convenience.h>
 #include <rocksdb/db.h>
@@ -351,11 +350,13 @@ rocksdb__on_open(uv_work_t *handle) {
   );
 
   if (options.create_if_missing) {
-    char *path = strdup(req->path);
+    std::string path(req->path);
+
+    auto end = path.size();
 
     while (true) {
       uv_fs_t fs;
-      err = uv_fs_mkdir(NULL, &fs, path, 0775, NULL);
+      err = uv_fs_mkdir(NULL, &fs, path.substr(0, end).c_str(), 0775, NULL);
 
       uv_fs_req_cleanup(&fs);
 
@@ -369,31 +370,28 @@ rocksdb__on_open(uv_work_t *handle) {
 
       case UV_EEXIST:
       case 0: {
-        size_t len = strlen(path);
+        if (end == path.size()) goto done;
 
-        if (len == strlen(req->path)) goto done;
+        auto i = path.find_first_of("/\\", end + 1);
 
-        path[len] = '/';
+        end = (i != std::string::npos) ? i : path.size();
 
         continue;
       }
 
       case UV_ENOENT: {
-        size_t dirname;
-        err = path_dirname(path, &dirname, path_behavior_system);
-        assert(err == 0);
+        auto i = path.find_last_of("/\\", end - 1);
 
-        if (dirname == strlen(req->path)) goto done;
+        if (i == std::string::npos || i == 0) goto done;
 
-        path[dirname - 1] = '\0';
+        end = i;
 
         continue;
       }
       }
     }
 
-  done:
-    free(path);
+  done:;
   }
 
   auto column_families = std::vector<ColumnFamilyDescriptor>(req->len);
@@ -531,6 +529,8 @@ rocksdb__on_open(uv_work_t *handle) {
 
   auto db = req->req.db;
 
+  db->read_only = read_only;
+
   if (status.ok()) {
     db->handle = ptr.release();
     db->lock = lock;
@@ -540,6 +540,41 @@ rocksdb__on_open(uv_work_t *handle) {
     }
 
     req->error = nullptr;
+
+    if (!read_only) {
+      auto db = reinterpret_cast<DB *>(req->req.db->handle);
+
+      std::string id;
+      status = db->GetDbSessionId(id);
+      assert(status.ok());
+
+      assert(id.size() == 20);
+
+      memcpy(req->req.db->id, id.data(), id.size());
+
+      auto path = db->GetName() + "/SESSION_ID";
+
+      uv_fs_t fs;
+      err = uv_fs_open(NULL, &fs, path.c_str(), UV_FS_O_WRONLY | UV_FS_O_CREAT | UV_FS_O_TRUNC, 0644, NULL);
+
+      uv_fs_req_cleanup(&fs);
+
+      if (err >= 0) {
+        int fd = err;
+
+        auto buf = uv_buf_init(id.data(), id.size());
+
+        err = uv_fs_write(NULL, &fs, fd, &buf, 1, 0, NULL);
+        assert(err == buf.len);
+
+        uv_fs_req_cleanup(&fs);
+
+        err = uv_fs_close(NULL, &fs, fd, NULL);
+        assert(err == 0);
+
+        uv_fs_req_cleanup(&fs);
+      }
+    }
   } else {
     db->handle = nullptr;
     db->lock = -1;
@@ -771,8 +806,44 @@ rocksdb__on_resume(uv_work_t *handle) {
   auto req = reinterpret_cast<rocksdb_resume_t *>(handle->data);
 
   auto lock = req->req.db->lock;
+  auto read_only = req->req.db->read_only;
 
   if (lock >= 0) rocksdb__lock(lock);
+
+  if (!read_only) {
+    auto db = reinterpret_cast<DB *>(req->req.db->handle);
+
+    auto path = db->GetName() + "/SESSION_ID";
+
+    uv_fs_t fs;
+    err = uv_fs_open(NULL, &fs, path.c_str(), UV_FS_O_RDONLY, 0, NULL);
+
+    uv_fs_req_cleanup(&fs);
+
+    char base[20] = {0};
+
+    auto buf = uv_buf_init(base, sizeof(base));
+
+    if (err >= 0) {
+      int fd = err;
+      err = uv_fs_read(NULL, &fs, fd, &buf, 1, 0, NULL);
+
+      uv_fs_req_cleanup(&fs);
+
+      err = uv_fs_close(NULL, &fs, fd, NULL);
+      assert(err == 0);
+
+      uv_fs_req_cleanup(&fs);
+    }
+
+    if (memcmp(req->req.db->id, base, sizeof(base)) != 0) {
+      if (lock >= 0) rocksdb__unlock(lock);
+
+      req->error = strdup("Session ID does not match");
+
+      return;
+    }
+  }
 
   auto db = reinterpret_cast<DB *>(req->req.db->handle);
 
@@ -788,9 +859,13 @@ rocksdb__on_resume(uv_work_t *handle) {
     } else {
       fs->suspend();
 
+      if (lock >= 0) rocksdb__unlock(lock);
+
       req->error = strdup(status.getState());
     }
   } else {
+    if (lock >= 0) rocksdb__unlock(lock);
+
     req->error = strdup(status.getState());
   }
 }
