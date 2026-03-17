@@ -102,7 +102,7 @@ rocksdb__from(rocksdb_bottommost_level_compaction_t policy) {
 namespace {
 
 static const rocksdb_options_t rocksdb__default_options = {
-  .version = 4,
+  .version = 5,
   .read_only = false,
   .create_if_missing = false,
   .create_missing_column_families = false,
@@ -116,6 +116,7 @@ static const rocksdb_options_t rocksdb__default_options = {
   .max_file_opening_threads = 16,
   .lock = -1,
   .wal_recovery_mode = rocksdb_point_in_time_recovery_mode,
+  .best_efforts_recovery = false,
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
@@ -344,6 +345,10 @@ rocksdb__on_open(uv_work_t *handle) {
   );
 
   options.wal_recovery_mode = rocksdb__from(wal_recovery_mode);
+
+  options.best_efforts_recovery = rocksdb__option<&rocksdb_options_t::best_efforts_recovery, bool>(
+    &req->options, 5
+  );
 
   auto read_only = rocksdb__option<&rocksdb_options_t::read_only, bool>(
     &req->options, 0
