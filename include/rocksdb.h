@@ -435,6 +435,7 @@ struct rocksdb_read_batch_s {
   rocksdb_read_t *reads;
 
   char **errors;
+  int *statuses;
 
   rocksdb_read_batch_cb cb;
 
@@ -477,6 +478,7 @@ struct rocksdb_write_batch_s {
   rocksdb_write_t *writes;
 
   char *error;
+  int status;
 
   rocksdb_write_batch_cb cb;
 
@@ -491,6 +493,7 @@ struct rocksdb_flush_s {
   rocksdb_column_family_t *column_family;
 
   char *error;
+  int status;
 
   rocksdb_flush_cb cb;
 
@@ -508,6 +511,7 @@ struct rocksdb_compact_range_s {
   rocksdb_slice_t end;
 
   char *error;
+  int status;
 
   rocksdb_compact_range_cb cb;
 
@@ -525,6 +529,7 @@ struct rocksdb_approximate_size_s {
   rocksdb_slice_t end;
 
   char *error;
+  int status;
 
   rocksdb_approximate_size_cb cb;
 

@@ -1383,8 +1383,10 @@ rocksdb__on_iterator_refresh(uv_work_t *handle) {
 
   if (status.ok()) {
     req->error = nullptr;
+    req->status = 0;
   } else {
     req->error = strdup(status.getState());
+    req->status = rocksdb__status(status);
   }
 }
 
@@ -1439,8 +1441,10 @@ rocksdb__on_iterator_read(uv_work_t *handle) {
 
   if (status.ok()) {
     req->error = nullptr;
+    req->status = 0;
   } else {
     req->error = strdup(status.getState());
+    req->status = rocksdb__status(status);
   }
 }
 
@@ -1477,6 +1481,7 @@ rocksdb__on_after_read(uv_work_t *handle, int status) {
   assert(err == 0);
 
   auto errors = req->errors;
+  auto statuses = req->statuses;
   auto len = req->len;
 
   req->cb(req, status);
@@ -1487,6 +1492,7 @@ rocksdb__on_after_read(uv_work_t *handle, int status) {
     }
 
     delete[] errors;
+    delete[] statuses;
   }
 }
 
@@ -1536,6 +1542,7 @@ rocksdb__on_read(uv_work_t *handle) {
     db->MultiGet(options, req->len, column_families.data(), keys.data(), values.data(), statuses.data());
 
     req->errors = new char *[req->len];
+    req->statuses = new int[req->len];
 
     for (size_t i = 0, n = req->len; i < n; i++) {
       auto op = &req->reads[i];
@@ -1548,12 +1555,15 @@ rocksdb__on_read(uv_work_t *handle) {
         value = rocksdb__slice_copy(values[i]);
 
         req->errors[i] = nullptr;
+        req->statuses[i] = 0;
       } else if (status.code() == Status::kNotFound) {
         value = rocksdb__slice_missing();
 
         req->errors[i] = nullptr;
+        req->statuses[i] = 0;
       } else {
         req->errors[i] = strdup(status.getState());
+        req->statuses[i] = rocksdb__status(status);
         continue;
       }
 
@@ -1641,8 +1651,10 @@ rocksdb__on_write(uv_work_t *handle) {
 
     if (status.ok()) {
       req->error = nullptr;
+      req->status = 0;
     } else {
       req->error = strdup(status.getState());
+      req->status = rocksdb__status(status);
     }
   }
 }
@@ -1701,8 +1713,10 @@ rocksdb__on_flush(uv_work_t *handle) {
 
   if (status.ok()) {
     req->error = nullptr;
+    req->status = 0;
   } else {
     req->error = strdup(status.getState());
+    req->status = rocksdb__status(status);
   }
 }
 
@@ -1787,8 +1801,10 @@ rocksdb__on_compact_range(uv_work_t *handle) {
 
   if (status.ok()) {
     req->error = nullptr;
+    req->status = 0;
   } else {
     req->error = strdup(status.getState());
+    req->status = rocksdb__status(status);
   }
 }
 
@@ -1869,9 +1885,11 @@ rocksdb__on_approximate_size(uv_work_t *handle) {
 
   if (status.ok()) {
     req->error = nullptr;
+    req->status = 0;
     req->result = result;
   } else {
     req->error = strdup(status.getState());
+    req->status = rocksdb__status(status);
     req->result = 0;
   }
 }
