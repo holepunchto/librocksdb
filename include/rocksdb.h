@@ -323,6 +323,7 @@ struct rocksdb_open_s {
   size_t len;
 
   char *error;
+  int status;
 
   rocksdb_open_cb cb;
 
@@ -333,6 +334,7 @@ struct rocksdb_close_s {
   rocksdb_req_t req;
 
   char *error;
+  int status;
 
   rocksdb_close_cb cb;
 
@@ -343,6 +345,7 @@ struct rocksdb_suspend_s {
   rocksdb_req_t req;
 
   char *error;
+  int status;
 
   rocksdb_suspend_cb cb;
 
@@ -353,6 +356,7 @@ struct rocksdb_resume_s {
   rocksdb_req_t req;
 
   char *error;
+  int status;
 
   rocksdb_resume_cb cb;
 
@@ -393,6 +397,7 @@ struct rocksdb_iterator_s {
   rocksdb_slice_t *values;
 
   char *error;
+  int status;
 
   rocksdb_iterator_cb open;
   rocksdb_iterator_cb close;
