@@ -231,6 +231,78 @@ rocksdb__option(const rocksdb_approximate_size_options_t *options, int min_versi
 
 namespace {
 
+static int
+rocksdb__status(Status status) {
+  using Code = Status::Code;
+  using SubCode = Status::SubCode;
+
+  if (status.ok()) return 0;
+
+  switch (status.subcode()) {
+  case SubCode::kNoSpace:
+  case SubCode::kSpaceLimit:
+    return UV_ENOSPC;
+  case SubCode::kMemoryLimit:
+    return UV_ENOMEM;
+  case SubCode::kPathNotFound:
+    return UV_ENOENT;
+  case SubCode::kMutexTimeout:
+  case SubCode::kLockTimeout:
+    return UV_ETIMEDOUT;
+  case SubCode::kLockLimit:
+    // return UV_ENOLCK; // TODO Fall through for now
+  case SubCode::kDeadlock:
+    return UV_EBUSY;
+  case SubCode::kIOFenced:
+    return UV_EROFS;
+  case SubCode::kStaleFile:
+    return UV_ENOENT;
+  default:
+    break;
+  }
+
+  switch (status.code()) {
+  case Code::kOk:
+    return 0;
+  case Code::kNotFound:
+    return UV_ENOENT;
+  case Code::kCorruption:
+    return UV_EIO;
+  case Code::kNotSupported:
+    return UV_ENOSYS;
+  case Code::kInvalidArgument:
+    return UV_EINVAL;
+  case Code::kIOError:
+    return UV_EIO;
+  case Code::kMergeInProgress:
+    return UV_EBUSY;
+  case Code::kIncomplete:
+    return UV_EIO;
+  case Code::kShutdownInProgress:
+    return UV_ESHUTDOWN;
+  case Code::kTimedOut:
+    return UV_ETIMEDOUT;
+  case Code::kAborted:
+    return UV_ECANCELED;
+  case Code::kBusy:
+    return UV_EBUSY;
+  case Code::kExpired:
+    return UV_ETIMEDOUT;
+  case Code::kTryAgain:
+    return UV_EAGAIN;
+  case Code::kCompactionTooLarge:
+    return UV_EFBIG;
+  case Code::kColumnFamilyDropped:
+    return UV_ENOENT;
+  default:
+    return UV_UNKNOWN;
+  }
+}
+
+} // namespace
+
+namespace {
+
 static inline int
 rocksdb__close_maybe(rocksdb_t *db);
 
@@ -585,6 +657,7 @@ rocksdb__on_open(uv_work_t *handle) {
     db->lock = -1;
 
     req->error = strdup(status.getState());
+    req->status = rocksdb__status(status);
 
     if (lock >= 0) {
       uv_fs_t fs;
@@ -656,8 +729,10 @@ rocksdb__on_close(uv_work_t *handle) {
 
   if (status.IsAborted()) { // Snaphots are still held
     req->error = strdup(status.getState());
+    req->status = rocksdb__status(status);
   } else {
     req->error = nullptr;
+    req->status = 0;
 
     auto env = db->GetEnv();
 
@@ -753,8 +828,10 @@ rocksdb__on_suspend(uv_work_t *handle) {
     if (lock >= 0) rocksdb__unlock(lock);
 
     req->error = nullptr;
+    req->status = 0;
   } else {
     req->error = strdup(status.getState());
+    req->status = rocksdb__status(status);
   }
 }
 
@@ -845,6 +922,7 @@ rocksdb__on_resume(uv_work_t *handle) {
       if (lock >= 0) rocksdb__unlock(lock);
 
       req->error = strdup("Session ID does not match");
+      req->status = UV_EINVAL;
 
       return;
     }
@@ -861,17 +939,20 @@ rocksdb__on_resume(uv_work_t *handle) {
 
     if (status.ok()) {
       req->error = nullptr;
+      req->status = 0;
     } else {
       fs->suspend();
 
       if (lock >= 0) rocksdb__unlock(lock);
 
       req->error = strdup(status.getState());
+      req->status = rocksdb__status(status);
     }
   } else {
     if (lock >= 0) rocksdb__unlock(lock);
 
     req->error = strdup(status.getState());
+    req->status = rocksdb__status(status);
   }
 }
 
@@ -1183,8 +1264,10 @@ rocksdb__on_iterator_open(uv_work_t *handle) {
 
   if (status.ok()) {
     req->error = nullptr;
+    req->status = 0;
   } else {
     req->error = strdup(status.getState());
+    req->status = rocksdb__status(status);
   }
 }
 
