@@ -6,11 +6,14 @@ list(APPEND tests
   delete-range
   delete-range-and-end
   iterate-prefix
+  iterate-sync
   open-close
   open-close-immediately
+  open-close-sync
   write-flush
   write-read
   write-read-snapshot
+  write-read-sync
 )
 
 foreach(test IN LISTS tests)
