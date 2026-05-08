@@ -14,6 +14,8 @@ on_close(rocksdb_close_t *req, int status) {
   assert(status == 0);
 
   assert(req->error == NULL);
+
+  rocksdb_close_cleanup(req);
 }
 
 static void
@@ -32,6 +34,8 @@ on_open(rocksdb_open_t *req, int status) {
   static rocksdb_close_t close;
   e = rocksdb_close(&db, &close, NULL, on_close);
   assert(e == 0);
+
+  rocksdb_open_cleanup(req);
 }
 
 int

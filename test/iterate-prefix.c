@@ -15,6 +15,8 @@ on_close(rocksdb_close_t *req, int status) {
   assert(status == 0);
 
   assert(req->error == NULL);
+
+  rocksdb_close_cleanup(req);
 }
 
 static void
@@ -31,6 +33,8 @@ on_iterator_close(rocksdb_iterator_t *req, int status) {
   static rocksdb_close_t close;
   e = rocksdb_close(&db, &close, NULL, on_close);
   assert(e == 0);
+
+  rocksdb_iterator_cleanup(req);
 }
 
 static void
@@ -57,6 +61,8 @@ on_iterator_read(rocksdb_iterator_t *req, int status) {
 
   e = rocksdb_iterator_close(req, on_iterator_close);
   assert(e == 0);
+
+  rocksdb_iterator_cleanup(req);
 }
 
 static void
@@ -70,6 +76,8 @@ on_iterator_open(rocksdb_iterator_t *req, int status) {
 
   e = rocksdb_iterator_read(req, keys, values, 4, on_iterator_read);
   assert(e == 0);
+
+  rocksdb_iterator_cleanup(req);
 }
 
 static void
@@ -88,6 +96,8 @@ on_write(rocksdb_write_batch_t *req, int status) {
   static rocksdb_iterator_t iterator;
   e = rocksdb_iterator_open(&db, &iterator, family, range, NULL, on_iterator_open);
   assert(e == 0);
+
+  rocksdb_write_cleanup(req);
 }
 
 static void
@@ -118,6 +128,8 @@ on_open(rocksdb_open_t *req, int status) {
   static rocksdb_write_batch_t batch;
   e = rocksdb_write(&db, &batch, writes, 8, NULL, on_write);
   assert(e == 0);
+
+  rocksdb_open_cleanup(req);
 }
 
 int

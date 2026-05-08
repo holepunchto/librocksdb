@@ -338,6 +338,44 @@ rocksdb__remove_req(T *req) {
 
 namespace {
 
+enum rocksdb_mode_t {
+  rocksdb_sync,
+  rocksdb_async,
+};
+
+template <rocksdb_mode_t mode, typename T>
+  requires(mode == rocksdb_sync)
+static inline int
+rocksdb__queue_work(uv_loop_t *loop, T *req, uv_work_cb work_cb, uv_after_work_cb after_cb) {
+  work_cb(&req->req.worker);
+
+  after_cb(&req->req.worker, 0);
+
+  return 0;
+}
+
+template <rocksdb_mode_t mode, typename T>
+  requires(mode == rocksdb_async)
+static inline int
+rocksdb__queue_work(uv_loop_t *loop, T *req, uv_work_cb work_cb, uv_after_work_cb after_cb) {
+  return uv_queue_work(loop, &req->req.worker, work_cb, after_cb);
+}
+
+template <typename T>
+static inline int
+rocksdb__queue_work(rocksdb_mode_t mode, uv_loop_t *loop, T *req, uv_work_cb work_cb, uv_after_work_cb after_cb) {
+  switch (mode) {
+  case rocksdb_sync:
+    return rocksdb__queue_work<rocksdb_sync>(loop, req, work_cb, after_cb);
+  case rocksdb_async:
+    return rocksdb__queue_work<rocksdb_async>(loop, req, work_cb, after_cb);
+  }
+}
+
+} // namespace
+
+namespace {
+
 static inline void
 rocksdb__on_after_open(uv_work_t *handle, int status) {
   int err;
@@ -349,15 +387,11 @@ rocksdb__on_after_open(uv_work_t *handle, int status) {
   err = rocksdb__remove_req(req);
   assert(err == 0);
 
-  auto error = req->error;
-
   if (db->state != rocksdb_closing) {
-    if (error == nullptr) db->state = rocksdb_active;
+    if (req->error == nullptr) db->state = rocksdb_active;
   }
 
-  req->cb(req, status);
-
-  if (error) free(error);
+  if (req->cb) req->cb(req, status);
 }
 
 static void
@@ -695,7 +729,15 @@ rocksdb_open(uv_loop_t *loop, rocksdb_t *db, rocksdb_open_t *req, const char *pa
 
   rocksdb__add_req(req);
 
-  return uv_queue_work(db->loop, &req->req.worker, rocksdb__on_open, rocksdb__on_after_open);
+  return rocksdb__queue_work(cb ? rocksdb_async : rocksdb_sync, db->loop, req, rocksdb__on_open, rocksdb__on_after_open);
+}
+
+extern "C" void
+rocksdb_open_cleanup(rocksdb_open_t *req) {
+  if (req->error) {
+    free(req->error);
+    req->error = nullptr;
+  }
 }
 
 namespace {
@@ -706,11 +748,7 @@ rocksdb__on_after_close(uv_work_t *handle, int status) {
 
   req->req.db->handle = nullptr;
 
-  auto error = req->error;
-
-  req->cb(req, status);
-
-  if (error) free(error);
+  if (req->cb) req->cb(req, status);
 }
 
 static void
@@ -768,6 +806,14 @@ rocksdb_close(rocksdb_t *db, rocksdb_close_t *req, rocksdb_idle_cb idle, rocksdb
   return rocksdb__close_maybe(db);
 }
 
+extern "C" void
+rocksdb_close_cleanup(rocksdb_close_t *req) {
+  if (req->error) {
+    free(req->error);
+    req->error = nullptr;
+  }
+}
+
 namespace {
 
 static inline int
@@ -778,7 +824,7 @@ rocksdb__close_maybe(rocksdb_t *db) {
 
   auto req = db->close;
 
-  return uv_queue_work(db->loop, &req->req.worker, rocksdb__on_close, rocksdb__on_after_close);
+  return rocksdb__queue_work(req->cb ? rocksdb_async : rocksdb_sync, db->loop, req, rocksdb__on_close, rocksdb__on_after_close);
 }
 
 } // namespace
@@ -796,16 +842,12 @@ rocksdb__on_after_suspend(uv_work_t *handle, int status) {
   err = rocksdb__remove_req(req);
   assert(err == 0);
 
-  auto error = req->error;
-
   if (db->state != rocksdb_closing) {
-    if (error == nullptr) db->state = rocksdb_suspended;
+    if (req->error == nullptr) db->state = rocksdb_suspended;
     else db->state = rocksdb_active;
   }
 
-  req->cb(req, status);
-
-  if (error) free(error);
+  if (req->cb) req->cb(req, status);
 }
 
 static void
@@ -853,7 +895,15 @@ rocksdb_suspend(rocksdb_t *db, rocksdb_suspend_t *req, rocksdb_suspend_cb cb) {
 
   rocksdb__add_req(req);
 
-  return uv_queue_work(db->loop, &req->req.worker, rocksdb__on_suspend, rocksdb__on_after_suspend);
+  return rocksdb__queue_work(cb ? rocksdb_async : rocksdb_sync, db->loop, req, rocksdb__on_suspend, rocksdb__on_after_suspend);
+}
+
+extern "C" void
+rocksdb_suspend_cleanup(rocksdb_suspend_t *req) {
+  if (req->error) {
+    free(req->error);
+    req->error = nullptr;
+  }
 }
 
 namespace {
@@ -869,16 +919,12 @@ rocksdb__on_after_resume(uv_work_t *handle, int status) {
   err = rocksdb__remove_req(req);
   assert(err == 0);
 
-  auto error = req->error;
-
   if (db->state != rocksdb_closing) {
-    if (error == nullptr) db->state = rocksdb_active;
+    if (req->error == nullptr) db->state = rocksdb_active;
     else db->state = rocksdb_suspended;
   }
 
-  req->cb(req, status);
-
-  if (error) free(error);
+  if (req->cb) req->cb(req, status);
 }
 
 static void
@@ -974,7 +1020,15 @@ rocksdb_resume(rocksdb_t *db, rocksdb_resume_t *req, rocksdb_resume_cb cb) {
 
   rocksdb__add_req(req);
 
-  return uv_queue_work(db->loop, &req->req.worker, rocksdb__on_resume, rocksdb__on_after_resume);
+  return rocksdb__queue_work(cb ? rocksdb_async : rocksdb_sync, db->loop, req, rocksdb__on_resume, rocksdb__on_after_resume);
+}
+
+extern "C" void
+rocksdb_resume_cleanup(rocksdb_resume_t *req) {
+  if (req->error) {
+    free(req->error);
+    req->error = nullptr;
+  }
 }
 
 extern "C" rocksdb_column_family_descriptor_t
@@ -1237,19 +1291,15 @@ rocksdb__on_after_iterator_open(uv_work_t *handle, int status) {
   err = rocksdb__iterator_close_maybe(req);
   assert(err == 0);
 
-  auto error = req->error;
-
   if (req->state != rocksdb_closing) {
-    if (error == nullptr) req->state = rocksdb_active;
+    if (req->error == nullptr) req->state = rocksdb_active;
     else {
       err = rocksdb__remove_req(req);
       assert(err == 0);
     }
   }
 
-  req->open(req, status);
-
-  if (error) free(error);
+  if (req->open) req->open(req, status);
 }
 
 static void
@@ -1293,7 +1343,7 @@ rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_fam
 
   rocksdb__add_req(req);
 
-  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_iterator_open, rocksdb__on_after_iterator_open);
+  return rocksdb__queue_work(cb ? rocksdb_async : rocksdb_sync, req->req.db->loop, req, rocksdb__on_iterator_open, rocksdb__on_after_iterator_open);
 }
 
 namespace {
@@ -1309,7 +1359,7 @@ rocksdb__on_after_iterator_close(uv_work_t *handle, int status) {
 
   req->inflight = false;
 
-  req->close(req, status);
+  if (req->close) req->close(req, status);
 }
 
 static void
@@ -1346,7 +1396,7 @@ rocksdb__iterator_close_maybe(rocksdb_iterator_t *req) {
   req->inflight = true;
   req->error = nullptr;
 
-  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_iterator_close, rocksdb__on_after_iterator_close);
+  return rocksdb__queue_work(req->close ? rocksdb_async : rocksdb_sync, req->req.db->loop, req, rocksdb__on_iterator_close, rocksdb__on_after_iterator_close);
 }
 
 } // namespace
@@ -1364,11 +1414,7 @@ rocksdb__on_after_iterator_refresh(uv_work_t *handle, int status) {
   err = rocksdb__iterator_close_maybe(req);
   assert(err == 0);
 
-  auto error = req->error;
-
-  req->refresh(req, status);
-
-  if (error) free(error);
+  if (req->refresh) req->refresh(req, status);
 }
 
 static void
@@ -1406,7 +1452,7 @@ rocksdb_iterator_refresh(rocksdb_iterator_t *req, rocksdb_range_t range, const r
   req->error = nullptr;
   req->refresh = cb;
 
-  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_iterator_close, rocksdb__on_after_iterator_refresh);
+  return rocksdb__queue_work(cb ? rocksdb_async : rocksdb_sync, req->req.db->loop, req, rocksdb__on_iterator_close, rocksdb__on_after_iterator_refresh);
 }
 
 namespace {
@@ -1422,11 +1468,7 @@ rocksdb__on_after_iterator_read(uv_work_t *handle, int status) {
   err = rocksdb__iterator_close_maybe(req);
   assert(err == 0);
 
-  auto error = req->error;
-
-  req->read(req, status);
-
-  if (error) free(error);
+  if (req->read) req->read(req, status);
 }
 
 static void
@@ -1466,7 +1508,15 @@ rocksdb_iterator_read(rocksdb_iterator_t *req, rocksdb_slice_t *keys, rocksdb_sl
   req->error = nullptr;
   req->read = cb;
 
-  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_iterator_read, rocksdb__on_after_iterator_read);
+  return rocksdb__queue_work(cb ? rocksdb_async : rocksdb_sync, req->req.db->loop, req, rocksdb__on_iterator_read, rocksdb__on_after_iterator_read);
+}
+
+extern "C" void
+rocksdb_iterator_cleanup(rocksdb_iterator_t *req) {
+  if (req->error) {
+    free(req->error);
+    req->error = nullptr;
+  }
 }
 
 namespace {
@@ -1480,20 +1530,7 @@ rocksdb__on_after_read(uv_work_t *handle, int status) {
   err = rocksdb__remove_req(req);
   assert(err == 0);
 
-  auto errors = req->errors;
-  auto statuses = req->statuses;
-  auto len = req->len;
-
-  req->cb(req, status);
-
-  if (errors) {
-    for (size_t i = 0, n = len; i < n; i++) {
-      if (errors[i]) free(errors[i]);
-    }
-
-    delete[] errors;
-    delete[] statuses;
-  }
+  if (req->cb) req->cb(req, status);
 }
 
 static void
@@ -1595,7 +1632,22 @@ rocksdb_read(rocksdb_t *db, rocksdb_read_batch_t *req, rocksdb_read_t *reads, si
 
   rocksdb__add_req(req);
 
-  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_read, rocksdb__on_after_read);
+  return rocksdb__queue_work(cb ? rocksdb_async : rocksdb_sync, req->req.db->loop, req, rocksdb__on_read, rocksdb__on_after_read);
+}
+
+extern "C" void
+rocksdb_read_cleanup(rocksdb_read_batch_t *req) {
+  if (req->errors) {
+    for (size_t i = 0, n = req->len; i < n; i++) {
+      if (req->errors[i]) free(req->errors[i]);
+    }
+
+    delete[] req->errors;
+    delete[] req->statuses;
+
+    req->errors = nullptr;
+    req->statuses = nullptr;
+  }
 }
 
 namespace {
@@ -1609,11 +1661,7 @@ rocksdb__on_after_write(uv_work_t *handle, int status) {
   err = rocksdb__remove_req(req);
   assert(err == 0);
 
-  auto error = req->error;
-
-  req->cb(req, status);
-
-  if (error) free(error);
+  if (req->cb) req->cb(req, status);
 }
 
 static void
@@ -1678,7 +1726,15 @@ rocksdb_write(rocksdb_t *db, rocksdb_write_batch_t *req, rocksdb_write_t *writes
 
   rocksdb__add_req(req);
 
-  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_write, rocksdb__on_after_write);
+  return rocksdb__queue_work(cb ? rocksdb_async : rocksdb_sync, req->req.db->loop, req, rocksdb__on_write, rocksdb__on_after_write);
+}
+
+extern "C" void
+rocksdb_write_cleanup(rocksdb_write_batch_t *req) {
+  if (req->error) {
+    free(req->error);
+    req->error = nullptr;
+  }
 }
 
 namespace {
@@ -1692,11 +1748,7 @@ rocksdb__on_after_flush(uv_work_t *handle, int status) {
   err = rocksdb__remove_req(req);
   assert(err == 0);
 
-  auto error = req->error;
-
-  req->cb(req, status);
-
-  if (error) free(error);
+  if (req->cb) req->cb(req, status);
 }
 
 static void
@@ -1738,7 +1790,15 @@ rocksdb_flush(rocksdb_t *db, rocksdb_flush_t *req, rocksdb_column_family_t *colu
 
   rocksdb__add_req(req);
 
-  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_flush, rocksdb__on_after_flush);
+  return rocksdb__queue_work(cb ? rocksdb_async : rocksdb_sync, req->req.db->loop, req, rocksdb__on_flush, rocksdb__on_after_flush);
+}
+
+extern "C" void
+rocksdb_flush_cleanup(rocksdb_flush_t *req) {
+  if (req->error) {
+    free(req->error);
+    req->error = nullptr;
+  }
 }
 
 namespace {
@@ -1752,11 +1812,7 @@ rocksdb__on_after_compact_range(uv_work_t *handle, int status) {
   err = rocksdb__remove_req(req);
   assert(err == 0);
 
-  auto error = req->error;
-
-  req->cb(req, status);
-
-  if (error) free(error);
+  if (req->cb) req->cb(req, status);
 }
 
 static void
@@ -1828,7 +1884,15 @@ rocksdb_compact_range(rocksdb_t *db, rocksdb_compact_range_t *req, rocksdb_colum
 
   rocksdb__add_req(req);
 
-  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_compact_range, rocksdb__on_after_compact_range);
+  return rocksdb__queue_work(cb ? rocksdb_async : rocksdb_sync, req->req.db->loop, req, rocksdb__on_compact_range, rocksdb__on_after_compact_range);
+}
+
+extern "C" void
+rocksdb_compact_range_cleanup(rocksdb_compact_range_t *req) {
+  if (req->error) {
+    free(req->error);
+    req->error = nullptr;
+  }
 }
 
 namespace {
@@ -1842,11 +1906,7 @@ rocksdb__on_after_approximate_size(uv_work_t *handle, int status) {
   err = rocksdb__remove_req(req);
   assert(err == 0);
 
-  auto error = req->error;
-
-  req->cb(req, status);
-
-  if (error) free(error);
+  if (req->cb) req->cb(req, status);
 }
 
 static void
@@ -1914,7 +1974,15 @@ rocksdb_approximate_size(rocksdb_t *db, rocksdb_approximate_size_t *req, rocksdb
 
   rocksdb__add_req(req);
 
-  return uv_queue_work(req->req.db->loop, &req->req.worker, rocksdb__on_approximate_size, rocksdb__on_after_approximate_size);
+  return rocksdb__queue_work(cb ? rocksdb_async : rocksdb_sync, req->req.db->loop, req, rocksdb__on_approximate_size, rocksdb__on_after_approximate_size);
+}
+
+extern "C" void
+rocksdb_approximate_size_cleanup(rocksdb_approximate_size_t *req) {
+  if (req->error) {
+    free(req->error);
+    req->error = nullptr;
+  }
 }
 
 extern "C" int
