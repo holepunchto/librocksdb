@@ -573,14 +573,26 @@ struct rocksdb_s {
 int
 rocksdb_open(uv_loop_t *loop, rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_idle_cb idle, rocksdb_open_cb cb);
 
+void
+rocksdb_open_cleanup(rocksdb_open_t *req);
+
 int
 rocksdb_close(rocksdb_t *db, rocksdb_close_t *req, rocksdb_idle_cb idle, rocksdb_close_cb cb);
+
+void
+rocksdb_close_cleanup(rocksdb_close_t *req);
 
 int
 rocksdb_suspend(rocksdb_t *db, rocksdb_suspend_t *req, rocksdb_suspend_cb cb);
 
+void
+rocksdb_suspend_cleanup(rocksdb_suspend_t *req);
+
 int
 rocksdb_resume(rocksdb_t *db, rocksdb_resume_t *req, rocksdb_resume_cb cb);
+
+void
+rocksdb_resume_cleanup(rocksdb_resume_t *req);
 
 rocksdb_column_family_descriptor_t
 rocksdb_column_family_descriptor(const char *name, const rocksdb_column_family_options_t *options);
@@ -612,20 +624,38 @@ rocksdb_iterator_refresh(rocksdb_iterator_t *req, rocksdb_range_t range, const r
 int
 rocksdb_iterator_read(rocksdb_iterator_t *req, rocksdb_slice_t *keys, rocksdb_slice_t *values, size_t capacity, rocksdb_iterator_cb cb);
 
+void
+rocksdb_iterator_cleanup(rocksdb_iterator_t *req);
+
 int
 rocksdb_read(rocksdb_t *db, rocksdb_read_batch_t *req, rocksdb_read_t *reads, size_t len, const rocksdb_read_options_t *options, rocksdb_read_batch_cb cb);
+
+void
+rocksdb_read_cleanup(rocksdb_read_batch_t *req);
 
 int
 rocksdb_write(rocksdb_t *db, rocksdb_write_batch_t *req, rocksdb_write_t *writes, size_t len, const rocksdb_write_options_t *options, rocksdb_write_batch_cb cb);
 
+void
+rocksdb_write_cleanup(rocksdb_write_batch_t *req);
+
 int
 rocksdb_flush(rocksdb_t *db, rocksdb_flush_t *req, rocksdb_column_family_t *column_family, const rocksdb_flush_options_t *options, rocksdb_flush_cb cb);
+
+void
+rocksdb_flush_cleanup(rocksdb_flush_t *req);
 
 int
 rocksdb_compact_range(rocksdb_t *db, rocksdb_compact_range_t *req, rocksdb_column_family_t *column_family, rocksdb_slice_t start, rocksdb_slice_t end, const rocksdb_compact_range_options_t *options, rocksdb_compact_range_cb cb);
 
+void
+rocksdb_compact_range_cleanup(rocksdb_compact_range_t *req);
+
 int
 rocksdb_approximate_size(rocksdb_t *db, rocksdb_approximate_size_t *req, rocksdb_column_family_t *column_family, rocksdb_slice_t start, rocksdb_slice_t end, const rocksdb_approximate_size_options_t *options, rocksdb_approximate_size_cb cb);
+
+void
+rocksdb_approximate_size_cleanup(rocksdb_approximate_size_t *req);
 
 int
 rocksdb_snapshot_create(rocksdb_t *db, rocksdb_snapshot_t *snapshot);

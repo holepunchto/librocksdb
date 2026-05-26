@@ -15,6 +15,8 @@ on_close(rocksdb_close_t *req, int status) {
   assert(status == 0);
 
   assert(req->error == NULL);
+
+  rocksdb_close_cleanup(req);
 }
 
 static void
@@ -47,6 +49,8 @@ on_read(rocksdb_read_batch_t *req, int status) {
   static rocksdb_close_t close;
   e = rocksdb_close(&db, &close, NULL, on_close);
   assert(e == 0);
+
+  rocksdb_read_cleanup(req);
 }
 
 static void
@@ -74,6 +78,8 @@ on_delete(rocksdb_write_batch_t *req, int status) {
   static rocksdb_read_batch_t batch;
   e = rocksdb_read(&db, &batch, reads, 5, NULL, on_read);
   assert(e == 0);
+
+  rocksdb_write_cleanup(req);
 }
 
 static void
@@ -93,6 +99,8 @@ on_write(rocksdb_write_batch_t *req, int status) {
   static rocksdb_write_batch_t batch;
   e = rocksdb_write(&db, &batch, &write, 1, NULL, on_delete);
   assert(e == 0);
+
+  rocksdb_write_cleanup(req);
 }
 
 static void
@@ -121,6 +129,8 @@ on_open(rocksdb_open_t *req, int status) {
   static rocksdb_write_batch_t batch;
   e = rocksdb_write(&db, &batch, writes, 5, NULL, on_write);
   assert(e == 0);
+
+  rocksdb_open_cleanup(req);
 }
 
 int
