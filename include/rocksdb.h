@@ -59,7 +59,7 @@ typedef enum {
   rocksdb_skip_any_corrupted_records_recovery_mode = 3,
 } rocksdb_wal_recovery_mode_t;
 
-/** @version 5 */
+/** @version 6 */
 struct rocksdb_options_s {
   int version;
 
@@ -104,6 +104,9 @@ struct rocksdb_options_s {
 
   /** @since 5 */
   bool best_efforts_recovery;
+
+  /** @since 6 */
+  bool enable_statistics;
 };
 
 typedef enum {

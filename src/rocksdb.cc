@@ -7,6 +7,7 @@
 #include <rocksdb/filter_policy.h>
 #include <rocksdb/options.h>
 #include <rocksdb/table.h>
+#include <rocksdb/statistics.h>
 #include <stdlib.h>
 #include <string.h>
 #include <uv.h>
@@ -102,7 +103,7 @@ rocksdb__from(rocksdb_bottommost_level_compaction_t policy) {
 namespace {
 
 static const rocksdb_options_t rocksdb__default_options = {
-  .version = 5,
+  .version = 6,
   .read_only = false,
   .create_if_missing = false,
   .create_missing_column_families = false,
@@ -117,6 +118,7 @@ static const rocksdb_options_t rocksdb__default_options = {
   .lock = -1,
   .wal_recovery_mode = rocksdb_point_in_time_recovery_mode,
   .best_efforts_recovery = false,
+  .enable_statistics = false
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
@@ -455,6 +457,13 @@ rocksdb__on_open(uv_work_t *handle) {
   options.best_efforts_recovery = rocksdb__option<&rocksdb_options_t::best_efforts_recovery, bool>(
     &req->options, 5
   );
+
+  auto enable_statistics =
+    rocksdb__option<&rocksdb_options_t::enable_statistics, bool>(&req->options, 6);
+
+  if (enable_statistics) {
+    options.statistics = CreateDBStatistics();
+  }
 
   auto read_only = rocksdb__option<&rocksdb_options_t::read_only, bool>(
     &req->options, 0
