@@ -6,6 +6,7 @@
 #include <rocksdb/db.h>
 #include <rocksdb/filter_policy.h>
 #include <rocksdb/options.h>
+#include <rocksdb/statistics.h>
 #include <rocksdb/table.h>
 #include <stdlib.h>
 #include <string.h>
@@ -40,6 +41,44 @@ rocksdb__from(rocksdb_wal_recovery_mode_t recovery_mode) {
     return WALRecoveryMode::kPointInTimeRecovery;
   case rocksdb_skip_any_corrupted_records_recovery_mode:
     return WALRecoveryMode::kSkipAnyCorruptedRecords;
+  }
+}
+
+static inline StatsLevel
+rocksdb__from(rocksdb_stats_level_t stats_level) {
+  switch (stats_level) {
+  case rocksdb_stats_level_all:
+    return StatsLevel::kAll;
+  case rocksdb_stats_level_except_time_for_mutex:
+    return StatsLevel::kExceptTimeForMutex;
+  case rocksdb_stats_level_except_detailed_timers:
+    return StatsLevel::kExceptDetailedTimers;
+  case rocksdb_stats_level_except_timers:
+    return StatsLevel::kExceptTimers;
+  case rocksdb_stats_level_disable_all:
+    return StatsLevel::kDisableAll;
+  case rocksdb_stats_level_except_histogram_or_timers:
+  default:
+    return StatsLevel::kExceptHistogramOrTimers;
+  }
+}
+
+static inline rocksdb_stats_level_t
+rocksdb__from(StatsLevel stats_level) {
+  switch (stats_level) {
+  case StatsLevel::kAll:
+    return rocksdb_stats_level_all;
+  case StatsLevel::kExceptTimeForMutex:
+    return rocksdb_stats_level_except_time_for_mutex;
+  case StatsLevel::kExceptDetailedTimers:
+    return rocksdb_stats_level_except_detailed_timers;
+  case StatsLevel::kExceptTimers:
+    return rocksdb_stats_level_except_timers;
+  case StatsLevel::kDisableAll:
+  default:
+    return rocksdb_stats_level_disable_all;
+  case StatsLevel::kExceptHistogramOrTimers:
+    return rocksdb_stats_level_except_histogram_or_timers;
   }
 }
 
@@ -102,7 +141,7 @@ rocksdb__from(rocksdb_bottommost_level_compaction_t policy) {
 namespace {
 
 static const rocksdb_options_t rocksdb__default_options = {
-  .version = 5,
+  .version = 6,
   .read_only = false,
   .create_if_missing = false,
   .create_missing_column_families = false,
@@ -117,6 +156,8 @@ static const rocksdb_options_t rocksdb__default_options = {
   .lock = -1,
   .wal_recovery_mode = rocksdb_point_in_time_recovery_mode,
   .best_efforts_recovery = false,
+  .enable_statistics = false,
+  .stats_level = rocksdb_stats_level_except_histogram_or_timers
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
@@ -455,6 +496,16 @@ rocksdb__on_open(uv_work_t *handle) {
   options.best_efforts_recovery = rocksdb__option<&rocksdb_options_t::best_efforts_recovery, bool>(
     &req->options, 5
   );
+
+  auto enable_statistics = rocksdb__option<&rocksdb_options_t::enable_statistics, bool>(&req->options, 6);
+
+  if (enable_statistics) {
+    auto stats_level =
+      rocksdb__option<&rocksdb_options_t::stats_level, rocksdb_stats_level_t>(&req->options, 6);
+
+    options.statistics = CreateDBStatistics();
+    options.statistics->set_stats_level(rocksdb__from(stats_level));
+  }
 
   auto read_only = rocksdb__option<&rocksdb_options_t::read_only, bool>(
     &req->options, 0
@@ -1029,6 +1080,34 @@ rocksdb_resume_cleanup(rocksdb_resume_t *req) {
     free(req->error);
     req->error = nullptr;
   }
+}
+
+extern "C" int
+rocksdb_stats_level_get(rocksdb_t *db, rocksdb_stats_level_t *level) {
+  auto handle = reinterpret_cast<DB *>(db->handle);
+  auto statistics = handle->GetOptions().statistics;
+
+  if (!statistics) {
+    return UV_EINVAL;
+  }
+
+  *level = rocksdb__from(statistics->get_stats_level());
+
+  return 0;
+}
+
+extern "C" int
+rocksdb_stats_level_set(rocksdb_t *db, rocksdb_stats_level_t level) {
+  auto handle = reinterpret_cast<DB *>(db->handle);
+  auto statistics = handle->GetOptions().statistics;
+
+  if (!statistics) {
+    return UV_EINVAL;
+  }
+
+  statistics->set_stats_level(rocksdb__from(level));
+
+  return 0;
 }
 
 extern "C" rocksdb_column_family_descriptor_t
