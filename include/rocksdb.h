@@ -59,6 +59,15 @@ typedef enum {
   rocksdb_skip_any_corrupted_records_recovery_mode = 3,
 } rocksdb_wal_recovery_mode_t;
 
+typedef enum {
+  rocksdb_stats_level_disable_all = 0,
+  rocksdb_stats_level_except_histogram_or_timers = 1,
+  rocksdb_stats_level_except_timers = 2,
+  rocksdb_stats_level_except_detailed_timers = 3,
+  rocksdb_stats_level_except_time_for_mutex = 4,
+  rocksdb_stats_level_all = 5,
+} rocksdb_stats_level_t;
+
 /** @version 6 */
 struct rocksdb_options_s {
   int version;
@@ -107,6 +116,9 @@ struct rocksdb_options_s {
 
   /** @since 6 */
   bool enable_statistics;
+
+  /** @since 6 */
+  rocksdb_stats_level_t stats_level;
 };
 
 typedef enum {
@@ -596,6 +608,12 @@ rocksdb_resume(rocksdb_t *db, rocksdb_resume_t *req, rocksdb_resume_cb cb);
 
 void
 rocksdb_resume_cleanup(rocksdb_resume_t *req);
+
+int
+rocksdb_stats_level_get(rocksdb_t *db, rocksdb_stats_level_t *level);
+
+int
+rocksdb_stats_level_set(rocksdb_t *db, rocksdb_stats_level_t level);
 
 rocksdb_column_family_descriptor_t
 rocksdb_column_family_descriptor(const char *name, const rocksdb_column_family_options_t *options);
