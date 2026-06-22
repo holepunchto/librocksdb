@@ -8,6 +8,7 @@
 #include <rocksdb/options.h>
 #include <rocksdb/statistics.h>
 #include <rocksdb/table.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <uv.h>
@@ -266,6 +267,30 @@ template <auto rocksdb_approximate_size_options_t::*P, typename T>
 static inline T
 rocksdb__option(const rocksdb_approximate_size_options_t *options, int min_version, T fallback = T(rocksdb__default_approximate_size_options.*P)) {
   return options->version >= min_version ? T(options->*P) : fallback;
+}
+
+// Returns the number of bytes of `rocksdb_options_t` that are valid for a
+// struct declaring the given ABI `version`. Fields are only ever appended, so
+// a caller compiled against an older version provides a shorter struct; copying
+// any more than this would read past the end of its allocation.
+static inline size_t
+rocksdb__options_size(int version) {
+  switch (version) {
+  case 0:
+    return offsetof(rocksdb_options_t, max_open_files);
+  case 1:
+    return offsetof(rocksdb_options_t, avoid_unnecessary_blocking_io);
+  case 2:
+    return offsetof(rocksdb_options_t, lock);
+  case 3:
+    return offsetof(rocksdb_options_t, wal_recovery_mode);
+  case 4:
+    return offsetof(rocksdb_options_t, best_efforts_recovery);
+  case 5:
+    return offsetof(rocksdb_options_t, enable_statistics);
+  default:
+    return sizeof(rocksdb_options_t);
+  }
 }
 
 } // namespace
@@ -767,7 +792,11 @@ rocksdb_open(uv_loop_t *loop, rocksdb_t *db, rocksdb_open_t *req, const char *pa
   db->close = nullptr;
 
   req->req.db = db;
-  req->options = options ? *options : rocksdb__default_options;
+
+  req->options = rocksdb__default_options;
+
+  if (options) memcpy(&req->options, options, rocksdb__options_size(options->version));
+
   req->column_families = column_families;
   req->handles = handles;
   req->len = len;
