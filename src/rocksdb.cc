@@ -154,7 +154,7 @@ rocksdb__from(WalFileType type) {
 namespace {
 
 static const rocksdb_options_t rocksdb__default_options = {
-  .version = 6,
+  .version = 7,
   .read_only = false,
   .create_if_missing = false,
   .create_missing_column_families = false,
@@ -170,7 +170,9 @@ static const rocksdb_options_t rocksdb__default_options = {
   .wal_recovery_mode = rocksdb_point_in_time_recovery_mode,
   .best_efforts_recovery = false,
   .enable_statistics = false,
-  .stats_level = rocksdb_stats_level_except_histogram_or_timers
+  .stats_level = rocksdb_stats_level_except_histogram_or_timers,
+  .wal_ttl_seconds = 0,
+  .wal_size_limit_mb = 0
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
@@ -300,6 +302,8 @@ rocksdb__options_size(int version) {
     return offsetof(rocksdb_options_t, best_efforts_recovery);
   case 5:
     return offsetof(rocksdb_options_t, enable_statistics);
+  case 6:
+    return offsetof(rocksdb_options_t, wal_ttl_seconds);
   default:
     return sizeof(rocksdb_options_t);
   }
@@ -581,6 +585,14 @@ rocksdb__on_open(uv_work_t *handle) {
     options.statistics = CreateDBStatistics();
     options.statistics->set_stats_level(rocksdb__from(stats_level));
   }
+
+  options.WAL_ttl_seconds = rocksdb__option<&rocksdb_options_t::wal_ttl_seconds, uint64_t>(
+    &req->options, 7
+  );
+
+  options.WAL_size_limit_MB = rocksdb__option<&rocksdb_options_t::wal_size_limit_mb, uint64_t>(
+    &req->options, 7
+  );
 
   auto read_only = rocksdb__option<&rocksdb_options_t::read_only, bool>(
     &req->options, 0

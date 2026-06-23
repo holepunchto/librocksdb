@@ -73,7 +73,7 @@ typedef enum {
   rocksdb_stats_level_all = 5,
 } rocksdb_stats_level_t;
 
-/** @version 6 */
+/** @version 7 */
 struct rocksdb_options_s {
   int version;
 
@@ -124,6 +124,12 @@ struct rocksdb_options_s {
 
   /** @since 6 */
   rocksdb_stats_level_t stats_level;
+
+  /** @since 7 */
+  uint64_t wal_ttl_seconds;
+
+  /** @since 7 */
+  uint64_t wal_size_limit_mb;
 };
 
 typedef enum {
