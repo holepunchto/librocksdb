@@ -3,6 +3,7 @@ list(APPEND tests
   compact-range
   compact-range-blobs
   create-folders-recursively
+  current-wal-file
   delete-range
   delete-range-and-end
   iterate-prefix
