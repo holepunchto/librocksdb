@@ -293,6 +293,44 @@ rocksdb__options_size(int version) {
   }
 }
 
+static inline size_t
+rocksdb__column_family_options_size(int version) {
+  switch (version) {
+  case 0:
+    return offsetof(rocksdb_column_family_options_t, optimize_filters_for_memory);
+  case 1:
+    return offsetof(rocksdb_column_family_options_t, filter_policy);
+  case 2:
+    return offsetof(rocksdb_column_family_options_t, top_level_index_pinning_tier);
+  case 3:
+    return offsetof(rocksdb_column_family_options_t, optimize_filters_for_hits);
+  case 4:
+    return offsetof(rocksdb_column_family_options_t, blob_garbage_collection_age_cutoff);
+  default:
+    return sizeof(rocksdb_column_family_options_t);
+  }
+}
+
+static inline size_t
+rocksdb__read_options_size(int version) {
+  switch (version) {
+  case 0:
+    return offsetof(rocksdb_read_options_t, async_io);
+  default:
+    return sizeof(rocksdb_read_options_t);
+  }
+}
+
+static inline size_t
+rocksdb__compact_range_options_size(int version) {
+  switch (version) {
+  case 0:
+    return offsetof(rocksdb_compact_range_options_t, blob_garbage_collection_policy);
+  default:
+    return sizeof(rocksdb_compact_range_options_t);
+  }
+}
+
 } // namespace
 
 namespace {
@@ -1144,7 +1182,11 @@ rocksdb_column_family_descriptor(const char *name, const rocksdb_column_family_o
   rocksdb_column_family_descriptor_t descriptor;
 
   descriptor.name = name;
-  descriptor.options = options ? *options : rocksdb__default_column_family_options;
+  descriptor.options = rocksdb__default_column_family_options;
+
+  if (options) {
+    memcpy(&descriptor.options, options, rocksdb__column_family_options_size(options->version));
+  }
 
   return descriptor;
 }
@@ -1730,7 +1772,10 @@ rocksdb_read(rocksdb_t *db, rocksdb_read_batch_t *req, rocksdb_read_t *reads, si
   }
 
   req->req.db = db;
-  req->options = options ? *options : rocksdb__default_read_options;
+  req->options = rocksdb__default_read_options;
+
+  if (options) memcpy(&req->options, options, rocksdb__read_options_size(options->version));
+
   req->reads = reads;
   req->errors = nullptr;
   req->len = len;
@@ -2073,7 +2118,10 @@ rocksdb_compact_range(rocksdb_t *db, rocksdb_compact_range_t *req, rocksdb_colum
   req->column_family = column_family;
   req->start = start;
   req->end = end;
-  req->options = options ? *options : rocksdb__default_compact_range_options;
+  req->options = rocksdb__default_compact_range_options;
+
+  if (options) memcpy(&req->options, options, rocksdb__compact_range_options_size(options->version));
+
   req->error = nullptr;
   req->cb = cb;
 
