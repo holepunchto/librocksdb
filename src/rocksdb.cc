@@ -8,6 +8,7 @@
 #include <rocksdb/options.h>
 #include <rocksdb/statistics.h>
 #include <rocksdb/table.h>
+#include <rocksdb/transaction_log.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -134,6 +135,17 @@ rocksdb__from(rocksdb_bottommost_level_compaction_t policy) {
     return BottommostLevelCompaction::kSkip;
   case rocksdb_force_bottommost_level_compaction:
     return BottommostLevelCompaction::kForce;
+  }
+}
+
+static inline rocksdb_wal_file_type_t
+rocksdb__from(WalFileType type) {
+  switch (type) {
+  case WalFileType::kArchivedLogFile:
+    return rocksdb_wal_file_archived;
+  case WalFileType::kAliveLogFile:
+  default:
+    return rocksdb_wal_file_alive;
   }
 }
 
@@ -2224,6 +2236,81 @@ rocksdb_approximate_size(rocksdb_t *db, rocksdb_approximate_size_t *req, rocksdb
 
 extern "C" void
 rocksdb_approximate_size_cleanup(rocksdb_approximate_size_t *req) {
+  if (req->error) {
+    free(req->error);
+    req->error = nullptr;
+  }
+}
+
+namespace {
+
+static void
+rocksdb__on_after_current_wal_file(uv_work_t *handle, int status) {
+  int err;
+
+  auto req = reinterpret_cast<rocksdb_current_wal_file_t *>(handle->data);
+
+  err = rocksdb__remove_req(req);
+  assert(err == 0);
+
+  if (req->cb) req->cb(req, status);
+}
+
+static void
+rocksdb__on_current_wal_file(uv_work_t *handle) {
+  auto req = reinterpret_cast<rocksdb_current_wal_file_t *>(handle->data);
+
+  auto db = reinterpret_cast<DB *>(req->req.db->handle);
+
+  std::unique_ptr<WalFile> wal;
+
+  auto status = db->GetCurrentWalFile(&wal);
+
+  if (status.ok()) {
+    auto path = wal->PathName();
+
+    auto &file = req->result;
+
+    file.version = 0;
+
+    strncpy(file.path, path.c_str(), sizeof(file.path) - 1);
+
+    file.path[sizeof(file.path) - 1] = '\0';
+
+    file.number = wal->LogNumber();
+    file.type = rocksdb__from(wal->Type());
+    file.start_sequence = wal->StartSequence();
+    file.size = wal->SizeFileBytes();
+
+    req->error = nullptr;
+    req->status = 0;
+  } else {
+    req->error = strdup(status.getState());
+    req->status = rocksdb__status(status);
+  }
+}
+
+} // namespace
+
+extern "C" int
+rocksdb_current_wal_file(rocksdb_t *db, rocksdb_current_wal_file_t *req, rocksdb_current_wal_file_cb cb) {
+  if (db->state != rocksdb_active) {
+    return UV_EINVAL;
+  }
+
+  req->req.db = db;
+  req->error = nullptr;
+  req->cb = cb;
+
+  req->req.worker.data = static_cast<void *>(req);
+
+  rocksdb__add_req(req);
+
+  return rocksdb__queue_work(cb ? rocksdb_async : rocksdb_sync, req->req.db->loop, req, rocksdb__on_current_wal_file, rocksdb__on_after_current_wal_file);
+}
+
+extern "C" void
+rocksdb_current_wal_file_cleanup(rocksdb_current_wal_file_t *req) {
   if (req->error) {
     free(req->error);
     req->error = nullptr;

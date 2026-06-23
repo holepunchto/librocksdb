@@ -39,6 +39,8 @@ typedef struct rocksdb_snapshot_s rocksdb_snapshot_t;
 typedef struct rocksdb_compact_s rocksdb_compact_t;
 typedef struct rocksdb_compact_range_s rocksdb_compact_range_t;
 typedef struct rocksdb_approximate_size_s rocksdb_approximate_size_t;
+typedef struct rocksdb_wal_file_s rocksdb_wal_file_t;
+typedef struct rocksdb_current_wal_file_s rocksdb_current_wal_file_t;
 typedef struct rocksdb_s rocksdb_t;
 
 typedef void (*rocksdb_idle_cb)(rocksdb_t *db);
@@ -53,6 +55,7 @@ typedef void (*rocksdb_flush_cb)(rocksdb_flush_t *req, int status);
 typedef void (*rocksdb_compact_cb)(rocksdb_compact_t *req, int status);
 typedef void (*rocksdb_compact_range_cb)(rocksdb_compact_range_t *req, int status);
 typedef void (*rocksdb_approximate_size_cb)(rocksdb_approximate_size_t *req, int status);
+typedef void (*rocksdb_current_wal_file_cb)(rocksdb_current_wal_file_t *req, int status);
 
 typedef enum {
   rocksdb_tolerate_corrupted_tail_records_recovery_mode = 0,
@@ -313,6 +316,31 @@ struct rocksdb_approximate_size_options_s {
   double files_size_error_margin;
 };
 
+typedef enum {
+  rocksdb_wal_file_archived = 0,
+  rocksdb_wal_file_alive = 1,
+} rocksdb_wal_file_type_t;
+
+/** @version 0 */
+struct rocksdb_wal_file_s {
+  int version;
+
+  /** @since 0 */
+  char path[4096 + 1 /* NULL */];
+
+  /** @since 0 */
+  uint64_t number;
+
+  /** @since 0 */
+  rocksdb_wal_file_type_t type;
+
+  /** @since 0 */
+  uint64_t start_sequence;
+
+  /** @since 0 */
+  uint64_t size;
+};
+
 struct rocksdb_column_family_s; // Opaque
 
 struct rocksdb_column_family_descriptor_s {
@@ -570,6 +598,19 @@ struct rocksdb_approximate_size_s {
   void *data;
 };
 
+struct rocksdb_current_wal_file_s {
+  rocksdb_req_t req;
+
+  rocksdb_wal_file_t result;
+
+  char *error;
+  int status;
+
+  rocksdb_current_wal_file_cb cb;
+
+  void *data;
+};
+
 struct rocksdb_snapshot_s {
   rocksdb_t *db;
 
@@ -700,6 +741,12 @@ rocksdb_approximate_size(rocksdb_t *db, rocksdb_approximate_size_t *req, rocksdb
 
 void
 rocksdb_approximate_size_cleanup(rocksdb_approximate_size_t *req);
+
+int
+rocksdb_current_wal_file(rocksdb_t *db, rocksdb_current_wal_file_t *req, rocksdb_current_wal_file_cb cb);
+
+void
+rocksdb_current_wal_file_cleanup(rocksdb_current_wal_file_t *req);
 
 int
 rocksdb_snapshot_create(rocksdb_t *db, rocksdb_snapshot_t *snapshot);
