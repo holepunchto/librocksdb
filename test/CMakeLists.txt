@@ -1,5 +1,6 @@
 list(APPEND tests
   approximate-size
+  compact
   compact-range
   compact-range-blobs
   create-folders-recursively

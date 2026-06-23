@@ -36,6 +36,7 @@ typedef struct rocksdb_write_s rocksdb_write_t;
 typedef struct rocksdb_write_batch_s rocksdb_write_batch_t;
 typedef struct rocksdb_flush_s rocksdb_flush_t;
 typedef struct rocksdb_snapshot_s rocksdb_snapshot_t;
+typedef struct rocksdb_compact_s rocksdb_compact_t;
 typedef struct rocksdb_compact_range_s rocksdb_compact_range_t;
 typedef struct rocksdb_approximate_size_s rocksdb_approximate_size_t;
 typedef struct rocksdb_s rocksdb_t;
@@ -49,6 +50,7 @@ typedef void (*rocksdb_iterator_cb)(rocksdb_iterator_t *iterator, int status);
 typedef void (*rocksdb_read_batch_cb)(rocksdb_read_batch_t *batch, int status);
 typedef void (*rocksdb_write_batch_cb)(rocksdb_write_batch_t *batch, int status);
 typedef void (*rocksdb_flush_cb)(rocksdb_flush_t *req, int status);
+typedef void (*rocksdb_compact_cb)(rocksdb_compact_t *req, int status);
 typedef void (*rocksdb_compact_range_cb)(rocksdb_compact_range_t *req, int status);
 typedef void (*rocksdb_approximate_size_cb)(rocksdb_approximate_size_t *req, int status);
 
@@ -515,6 +517,21 @@ struct rocksdb_flush_s {
   void *data;
 };
 
+struct rocksdb_compact_s {
+  rocksdb_req_t req;
+
+  rocksdb_compact_range_options_t options;
+
+  rocksdb_column_family_t *column_family;
+
+  char *error;
+  int status;
+
+  rocksdb_compact_cb cb;
+
+  void *data;
+};
+
 struct rocksdb_compact_range_s {
   rocksdb_req_t req;
 
@@ -665,6 +682,12 @@ rocksdb_flush(rocksdb_t *db, rocksdb_flush_t *req, rocksdb_column_family_t *colu
 
 void
 rocksdb_flush_cleanup(rocksdb_flush_t *req);
+
+int
+rocksdb_compact(rocksdb_t *db, rocksdb_compact_t *req, rocksdb_column_family_t *column_family, const rocksdb_compact_range_options_t *options, rocksdb_compact_cb cb);
+
+void
+rocksdb_compact_cleanup(rocksdb_compact_t *req);
 
 int
 rocksdb_compact_range(rocksdb_t *db, rocksdb_compact_range_t *req, rocksdb_column_family_t *column_family, rocksdb_slice_t start, rocksdb_slice_t end, const rocksdb_compact_range_options_t *options, rocksdb_compact_range_cb cb);

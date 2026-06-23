@@ -1957,6 +1957,95 @@ rocksdb_flush_cleanup(rocksdb_flush_t *req) {
 namespace {
 
 static void
+rocksdb__on_after_compact(uv_work_t *handle, int status) {
+  int err;
+
+  auto req = reinterpret_cast<rocksdb_compact_t *>(handle->data);
+
+  err = rocksdb__remove_req(req);
+  assert(err == 0);
+
+  if (req->cb) req->cb(req, status);
+}
+
+static void
+rocksdb__on_compact(uv_work_t *handle) {
+  auto req = reinterpret_cast<rocksdb_compact_t *>(handle->data);
+
+  auto db = reinterpret_cast<DB *>(req->req.db->handle);
+
+  auto column_family = reinterpret_cast<ColumnFamilyHandle *>(req->column_family);
+
+  CompactRangeOptions options;
+
+  options.exclusive_manual_compaction = rocksdb__option<&rocksdb_compact_range_options_t::exclusive_manual_compaction, bool>(
+    &req->options, 0
+  );
+
+  auto blob_garbage_collection_policy = rocksdb__option<&rocksdb_compact_range_options_t::blob_garbage_collection_policy, rocksdb_blob_garbage_collection_policy_t>(
+    &req->options, 1
+  );
+
+  options.blob_garbage_collection_policy = rocksdb__from(blob_garbage_collection_policy);
+
+  options.blob_garbage_collection_age_cutoff = rocksdb__option<&rocksdb_compact_range_options_t::blob_garbage_collection_age_cutoff, double>(
+    &req->options, 1
+  );
+
+  auto bottommost_level_compaction = rocksdb__option<&rocksdb_compact_range_options_t::bottommost_level_compaction, rocksdb_bottommost_level_compaction_t>(
+    &req->options, 1
+  );
+
+  options.bottommost_level_compaction = rocksdb__from(bottommost_level_compaction);
+
+  auto status = db->CompactRange(
+    options,
+    column_family,
+    nullptr,
+    nullptr
+  );
+
+  if (status.ok()) {
+    req->error = nullptr;
+    req->status = 0;
+  } else {
+    req->error = strdup(status.getState());
+    req->status = rocksdb__status(status);
+  }
+}
+
+} // namespace
+
+extern "C" int
+rocksdb_compact(rocksdb_t *db, rocksdb_compact_t *req, rocksdb_column_family_t *column_family, const rocksdb_compact_range_options_t *options, rocksdb_compact_cb cb) {
+  if (db->state != rocksdb_active) {
+    return UV_EINVAL;
+  }
+
+  req->req.db = db;
+  req->column_family = column_family;
+  req->options = options ? *options : rocksdb__default_compact_range_options;
+  req->error = nullptr;
+  req->cb = cb;
+
+  req->req.worker.data = static_cast<void *>(req);
+
+  rocksdb__add_req(req);
+
+  return rocksdb__queue_work(cb ? rocksdb_async : rocksdb_sync, req->req.db->loop, req, rocksdb__on_compact, rocksdb__on_after_compact);
+}
+
+extern "C" void
+rocksdb_compact_cleanup(rocksdb_compact_t *req) {
+  if (req->error) {
+    free(req->error);
+    req->error = nullptr;
+  }
+}
+
+namespace {
+
+static void
 rocksdb__on_after_compact_range(uv_work_t *handle, int status) {
   int err;
 
