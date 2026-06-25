@@ -1412,6 +1412,13 @@ rocksdb_stats_level_set(rocksdb_t *db, rocksdb_stats_level_t level) {
   return 0;
 }
 
+extern "C" void
+rocksdb_options_init(rocksdb_options_t *options, int version) {
+  memcpy(options, &rocksdb__default_options, rocksdb__options_size(version));
+
+  options->version = version;
+}
+
 extern "C" rocksdb_column_family_descriptor_t
 rocksdb_column_family_descriptor(const char *name, const rocksdb_column_family_options_t *options) {
   rocksdb_column_family_descriptor_t descriptor;

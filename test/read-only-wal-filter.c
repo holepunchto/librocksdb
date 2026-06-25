@@ -17,11 +17,10 @@ main() {
     rocksdb_t db;
     rocksdb_column_family_t *family;
 
-    rocksdb_options_t options = {
-      .version = 8,
-      .create_if_missing = true,
-      .avoid_flush_during_shutdown = true,
-    };
+    rocksdb_options_t options;
+    rocksdb_options_init(&options, 8);
+    options.create_if_missing = true;
+    options.avoid_flush_during_shutdown = true;
 
     rocksdb_column_family_descriptor_t descriptor = rocksdb_column_family_descriptor("default", NULL);
 
@@ -70,12 +69,11 @@ main() {
       rocksdb_slice_init("a:", 2),
     };
 
-    rocksdb_options_t options = {
-      .version = 8,
-      .read_only = true,
-      .wal_filter_prefixes = prefixes,
-      .wal_filter_prefixes_len = 1,
-    };
+    rocksdb_options_t options;
+    rocksdb_options_init(&options, 8);
+    options.read_only = true;
+    options.wal_filter_prefixes = prefixes;
+    options.wal_filter_prefixes_len = 1;
 
     rocksdb_column_family_descriptor_t descriptor = rocksdb_column_family_descriptor("default", NULL);
 
@@ -133,12 +131,11 @@ main() {
       rocksdb_slice_init("a:", 2),
     };
 
-    rocksdb_options_t options = {
-      .version = 8,
-      .read_only = false,
-      .wal_filter_prefixes = prefixes,
-      .wal_filter_prefixes_len = 1,
-    };
+    rocksdb_options_t options;
+    rocksdb_options_init(&options, 8);
+    options.read_only = false;
+    options.wal_filter_prefixes = prefixes;
+    options.wal_filter_prefixes_len = 1;
 
     rocksdb_column_family_descriptor_t descriptor = rocksdb_column_family_descriptor("default", NULL);
 

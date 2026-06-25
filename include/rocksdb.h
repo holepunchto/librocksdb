@@ -658,6 +658,9 @@ struct rocksdb_s {
   rocksdb_close_t *close;
 };
 
+void
+rocksdb_options_init(rocksdb_options_t *options, int version);
+
 int
 rocksdb_open(uv_loop_t *loop, rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_idle_cb idle, rocksdb_open_cb cb);
 
