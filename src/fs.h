@@ -16,17 +16,15 @@
 
 using namespace rocksdb;
 
-typedef struct rocksdb_file_system_s rocksdb_file_system_t;
-
-struct rocksdb_file_system_s : FileSystem {
+struct rocksdb_file_system_t : FileSystem {
 private:
-  struct rocksdb_lock_s : FileLock {
+  struct rocksdb_lock_t : FileLock {
   private:
     std::string fname;
     FileLock *lock;
 
   public:
-    explicit rocksdb_lock_s(std::string fname, FileLock *lock) : fname(fname), lock(lock) {}
+    explicit rocksdb_lock_t(std::string fname, FileLock *lock) : fname(fname), lock(lock) {}
 
     inline bool
     held() const {
@@ -58,13 +56,13 @@ private:
     }
   };
 
-  struct rocksdb_sequential_file_s : FSSequentialFile {
+  struct rocksdb_sequential_file_t : FSSequentialFile {
   private:
     rocksdb_file_system_t *fs;
     std::unique_ptr<FSSequentialFile> file;
 
   public:
-    explicit rocksdb_sequential_file_s(rocksdb_file_system_t *fs, std::unique_ptr<FSSequentialFile> &&file)
+    explicit rocksdb_sequential_file_t(rocksdb_file_system_t *fs, std::unique_ptr<FSSequentialFile> &&file)
         : fs(fs),
           file(std::move(file)) {}
 
@@ -106,13 +104,13 @@ private:
     }
   };
 
-  struct rocksdb_random_access_file_s : FSRandomAccessFile {
+  struct rocksdb_random_access_file_t : FSRandomAccessFile {
   private:
     rocksdb_file_system_t *fs;
     std::unique_ptr<FSRandomAccessFile> file;
 
   public:
-    explicit rocksdb_random_access_file_s(rocksdb_file_system_t *fs, std::unique_ptr<FSRandomAccessFile> &&file)
+    explicit rocksdb_random_access_file_t(rocksdb_file_system_t *fs, std::unique_ptr<FSRandomAccessFile> &&file)
         : fs(fs),
           file(std::move(file)) {}
 
@@ -168,13 +166,13 @@ private:
     }
   };
 
-  struct rocksdb_writable_file_s : FSWritableFile {
+  struct rocksdb_writable_file_t : FSWritableFile {
   private:
     rocksdb_file_system_t *fs;
     std::unique_ptr<FSWritableFile> file;
 
   public:
-    explicit rocksdb_writable_file_s(rocksdb_file_system_t *fs, std::unique_ptr<FSWritableFile> &&file)
+    explicit rocksdb_writable_file_t(rocksdb_file_system_t *fs, std::unique_ptr<FSWritableFile> &&file)
         : fs(fs),
           file(std::move(file)) {}
 
@@ -296,13 +294,13 @@ private:
     }
   };
 
-  struct rocksdb_random_rw_file_s : FSRandomRWFile {
+  struct rocksdb_random_rw_file_t : FSRandomRWFile {
   private:
     rocksdb_file_system_t *fs;
     std::unique_ptr<FSRandomRWFile> file;
 
   public:
-    explicit rocksdb_random_rw_file_s(rocksdb_file_system_t *fs, std::unique_ptr<FSRandomRWFile> &&file)
+    explicit rocksdb_random_rw_file_t(rocksdb_file_system_t *fs, std::unique_ptr<FSRandomRWFile> &&file)
         : fs(fs),
           file(std::move(file)) {}
 
@@ -352,13 +350,13 @@ private:
     }
   };
 
-  struct rocksdb_directory_s : FSDirectory {
+  struct rocksdb_directory_t : FSDirectory {
   private:
     rocksdb_file_system_t *fs;
     std::unique_ptr<FSDirectory> dir;
 
   public:
-    explicit rocksdb_directory_s(rocksdb_file_system_t *fs, std::unique_ptr<FSDirectory> &&dir)
+    explicit rocksdb_directory_t(rocksdb_file_system_t *fs, std::unique_ptr<FSDirectory> &&dir)
         : fs(fs),
           dir(std::move(dir)) {}
 
@@ -390,14 +388,14 @@ private:
   std::atomic<int> pending;
   std::mutex mutex;
   std::condition_variable drained;
-  std::set<rocksdb_lock_s *> locks;
+  std::set<rocksdb_lock_t *> locks;
 
 public:
-  explicit rocksdb_file_system_s() : fs(FileSystem::Default()), suspended(false), pending(0), mutex(), drained(), locks() {}
+  explicit rocksdb_file_system_t() : fs(FileSystem::Default()), suspended(false), pending(0), mutex(), drained(), locks() {}
 
-  rocksdb_file_system_s(const rocksdb_file_system_s &) = delete;
+  rocksdb_file_system_t(const rocksdb_file_system_t &) = delete;
 
-  ~rocksdb_file_system_s() override {}
+  ~rocksdb_file_system_t() override {}
 
   inline void
   suspend() {
@@ -421,7 +419,7 @@ public:
   inline auto
   resume() {
     if (suspended.load()) {
-      auto reacquired = std::set<rocksdb_lock_s *>();
+      auto reacquired = std::set<rocksdb_lock_t *>();
 
       for (const auto &lock : locks) {
         auto status = lock->acquire(fs);
@@ -474,7 +472,7 @@ private:
     auto status = fs->LockFile(fname, options, &lock, dbg);
 
     if (status.ok()) {
-      auto wrapper = new rocksdb_lock_s(fname, lock);
+      auto wrapper = new rocksdb_lock_t(fname, lock);
 
       locks.insert(wrapper);
 
@@ -487,7 +485,7 @@ private:
   }
 
   IOStatus UnlockFile(FileLock *lock, const IOOptions &options, IODebugContext *dbg) override {
-    auto wrapper = static_cast<rocksdb_lock_s *>(lock);
+    auto wrapper = static_cast<rocksdb_lock_t *>(lock);
 
     auto status = IOStatus::OK();
 
@@ -513,7 +511,7 @@ private:
       auto status = fs->NewSequentialFile(fname, options, &file, dbg);
 
       if (status.ok()) {
-        auto wrapper = std::make_unique<rocksdb_sequential_file_s>(this, std::move(file));
+        auto wrapper = std::make_unique<rocksdb_sequential_file_t>(this, std::move(file));
 
         *result = std::move(wrapper);
       } else {
@@ -531,7 +529,7 @@ private:
       auto status = fs->NewRandomAccessFile(fname, options, &file, dbg);
 
       if (status.ok()) {
-        auto wrapper = std::make_unique<rocksdb_random_access_file_s>(this, std::move(file));
+        auto wrapper = std::make_unique<rocksdb_random_access_file_t>(this, std::move(file));
 
         *result = std::move(wrapper);
       } else {
@@ -549,7 +547,7 @@ private:
       auto status = fs->NewWritableFile(fname, options, &file, dbg);
 
       if (status.ok()) {
-        auto wrapper = std::make_unique<rocksdb_writable_file_s>(this, std::move(file));
+        auto wrapper = std::make_unique<rocksdb_writable_file_t>(this, std::move(file));
 
         *result = std::move(wrapper);
       } else {
@@ -567,7 +565,7 @@ private:
       auto status = fs->ReopenWritableFile(fname, options, &file, dbg);
 
       if (status.ok()) {
-        auto wrapper = std::make_unique<rocksdb_writable_file_s>(this, std::move(file));
+        auto wrapper = std::make_unique<rocksdb_writable_file_t>(this, std::move(file));
 
         *result = std::move(wrapper);
       } else {
@@ -585,7 +583,7 @@ private:
       auto status = fs->ReuseWritableFile(fname, old_fname, options, &file, dbg);
 
       if (status.ok()) {
-        auto wrapper = std::make_unique<rocksdb_writable_file_s>(this, std::move(file));
+        auto wrapper = std::make_unique<rocksdb_writable_file_t>(this, std::move(file));
 
         *result = std::move(wrapper);
       } else {
@@ -603,7 +601,7 @@ private:
       auto status = fs->NewRandomRWFile(fname, options, &file, dbg);
 
       if (status.ok()) {
-        auto wrapper = std::make_unique<rocksdb_random_rw_file_s>(this, std::move(file));
+        auto wrapper = std::make_unique<rocksdb_random_rw_file_t>(this, std::move(file));
 
         *result = std::move(wrapper);
       } else {
@@ -621,7 +619,7 @@ private:
       auto status = fs->NewDirectory(name, options, &dir, dbg);
 
       if (status.ok()) {
-        auto wrapper = std::make_unique<rocksdb_directory_s>(this, std::move(dir));
+        auto wrapper = std::make_unique<rocksdb_directory_t>(this, std::move(dir));
 
         *result = std::move(wrapper);
       } else {
