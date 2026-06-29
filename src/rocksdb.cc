@@ -9,6 +9,8 @@
 #include <rocksdb/statistics.h>
 #include <rocksdb/table.h>
 #include <rocksdb/transaction_log.h>
+#include <rocksdb/wal_filter.h>
+#include <rocksdb/write_batch.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -154,7 +156,7 @@ rocksdb__from(WalFileType type) {
 namespace {
 
 static const rocksdb_options_t rocksdb__default_options = {
-  .version = 7,
+  .version = 8,
   .read_only = false,
   .create_if_missing = false,
   .create_missing_column_families = false,
@@ -172,7 +174,10 @@ static const rocksdb_options_t rocksdb__default_options = {
   .enable_statistics = false,
   .stats_level = rocksdb_stats_level_except_histogram_or_timers,
   .wal_ttl_seconds = 0,
-  .wal_size_limit_mb = 0
+  .wal_size_limit_mb = 0,
+  .avoid_flush_during_shutdown = false,
+  .wal_filter_prefixes = nullptr,
+  .wal_filter_prefixes_len = 0
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
@@ -304,6 +309,8 @@ rocksdb__options_size(int version) {
     return offsetof(rocksdb_options_t, enable_statistics);
   case 6:
     return offsetof(rocksdb_options_t, wal_ttl_seconds);
+  case 7:
+    return offsetof(rocksdb_options_t, avoid_flush_during_shutdown);
   default:
     return sizeof(rocksdb_options_t);
   }
@@ -496,6 +503,181 @@ rocksdb__queue_work(rocksdb_mode_t mode, uv_loop_t *loop, T *req, uv_work_cb wor
 
 namespace {
 
+// A `WalFilter` that, during recovery, keeps only those keys whose bytes begin
+// with one of a set of allowed prefixes and drops the rest before they are
+// inserted into a memtable. This is the only way to bound recovery memory when
+// opening read-only, where the recovered memtable cannot be flushed to make
+// room as it fills.
+//
+// Filtering is applied at two granularities:
+//
+//   - A write batch that touches only the default column family is rewritten in
+//     place, dropping its individual non-matching records.
+//   - Any other batch (one with records in a non-default column family, or with
+//     record types we cannot faithfully reconstruct through the public write
+//     batch API) is dropped as a whole if none of its keys match, and otherwise
+//     replayed in full.
+//
+// The resulting view is intentionally partial; the SST files still contain
+// every key, so reads outside the allowed prefixes may observe stale data that
+// was never replayed from the WAL. It is therefore only ever applied when
+// opening read-only.
+struct rocksdb_prefix_wal_filter_t : public WalFilter {
+  std::vector<std::string> prefixes;
+
+  rocksdb_prefix_wal_filter_t(const rocksdb_slice_t *prefixes, size_t len) {
+    this->prefixes.reserve(len);
+
+    for (size_t i = 0; i < len; i++) {
+      this->prefixes.emplace_back(prefixes[i].data, prefixes[i].len);
+    }
+  }
+
+  const char *
+  Name() const override {
+    return "rocksdb.prefix_wal_filter";
+  }
+
+  WalProcessingOption
+  LogRecordFound(unsigned long long, const std::string &, const WriteBatch &batch, WriteBatch *new_batch, bool *batch_changed) override {
+    rocksdb_write_batch_handler_t handler(*this, *new_batch);
+
+    auto status = batch.Iterate(&handler);
+
+    if (!status.ok()) {
+      // The batch holds a record type we cannot inspect or reconstruct, such as
+      // a two-phase-commit marker, so replay it unchanged to stay correct.
+      new_batch->Clear();
+
+      return WalProcessingOption::kContinueProcessing;
+    }
+
+    if (handler.rewritable) {
+      *batch_changed = true;
+
+      return WalProcessingOption::kContinueProcessing;
+    }
+
+    new_batch->Clear();
+
+    // The batch could not be rewritten in place; keep it whole if any key
+    // matched and drop it entirely otherwise.
+    return handler.matched
+             ? WalProcessingOption::kContinueProcessing
+             : WalProcessingOption::kIgnoreCurrentRecord;
+  }
+
+private:
+  bool
+  matches(const Slice &key) const {
+    for (const auto &prefix : prefixes) {
+      if (key.size() >= prefix.size() && memcmp(key.data(), prefix.data(), prefix.size()) == 0) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  struct rocksdb_write_batch_handler_t : public WriteBatch::Handler {
+    const rocksdb_prefix_wal_filter_t &filter;
+    WriteBatch &out;
+
+    // Set once any key in the batch matches an allowed prefix.
+    bool matched = false;
+
+    // Cleared once a record is seen that cannot be reconstructed through the
+    // public write batch API, namely anything outside the default column
+    // family, after which the batch can only be kept or dropped as a whole.
+    bool rewritable = true;
+
+    rocksdb_write_batch_handler_t(const rocksdb_prefix_wal_filter_t &filter, WriteBatch &out)
+        : filter(filter),
+          out(out) {}
+
+    Status
+    PutCF(uint32_t column_family_id, const Slice &key, const Slice &value) override {
+      if (!filter.matches(key)) return skip(column_family_id);
+
+      matched = true;
+
+      if (column_family_id != 0) {
+        rewritable = false;
+        return Status::OK();
+      }
+
+      return out.Put(key, value);
+    }
+
+    Status
+    DeleteCF(uint32_t column_family_id, const Slice &key) override {
+      if (!filter.matches(key)) return skip(column_family_id);
+
+      matched = true;
+
+      if (column_family_id != 0) {
+        rewritable = false;
+        return Status::OK();
+      }
+
+      return out.Delete(key);
+    }
+
+    Status
+    SingleDeleteCF(uint32_t column_family_id, const Slice &key) override {
+      if (!filter.matches(key)) return skip(column_family_id);
+
+      matched = true;
+
+      if (column_family_id != 0) {
+        rewritable = false;
+        return Status::OK();
+      }
+
+      return out.SingleDelete(key);
+    }
+
+    Status
+    MergeCF(uint32_t column_family_id, const Slice &key, const Slice &value) override {
+      if (!filter.matches(key)) return skip(column_family_id);
+
+      matched = true;
+
+      if (column_family_id != 0) {
+        rewritable = false;
+        return Status::OK();
+      }
+
+      return out.Merge(key, value);
+    }
+
+    Status
+    DeleteRangeCF(uint32_t column_family_id, const Slice &begin, const Slice &end) override {
+      // A range tombstone can span both matching and non-matching keys, so it is
+      // always retained to preserve deletes over the allowed prefixes.
+      matched = true;
+
+      if (column_family_id != 0) {
+        rewritable = false;
+        return Status::OK();
+      }
+
+      return out.DeleteRange(begin, end);
+    }
+
+  private:
+    // A non-matching record in the default column family is simply omitted from
+    // the rewritten batch; one in any other column family means the batch can no
+    // longer be rewritten in place.
+    Status
+    skip(uint32_t column_family_id) {
+      if (column_family_id != 0) rewritable = false;
+
+      return Status::OK();
+    }
+  };
+};
+
 static inline void
 rocksdb__on_after_open(uv_work_t *handle, int status) {
   int err;
@@ -594,8 +776,20 @@ rocksdb__on_open(uv_work_t *handle) {
     &req->options, 7
   );
 
+  options.avoid_flush_during_shutdown = rocksdb__option<&rocksdb_options_t::avoid_flush_during_shutdown, bool>(
+    &req->options, 8
+  );
+
   auto read_only = rocksdb__option<&rocksdb_options_t::read_only, bool>(
     &req->options, 0
+  );
+
+  auto wal_filter_prefixes = rocksdb__option<&rocksdb_options_t::wal_filter_prefixes, const rocksdb_slice_t *>(
+    &req->options, 8
+  );
+
+  auto wal_filter_prefixes_len = rocksdb__option<&rocksdb_options_t::wal_filter_prefixes_len, size_t>(
+    &req->options, 8
   );
 
   if (options.create_if_missing) {
@@ -770,10 +964,27 @@ rocksdb__on_open(uv_work_t *handle) {
 
   std::unique_ptr<DB> ptr;
 
-  if (read_only) {
-    status = DB::OpenForReadOnly(options, req->path, column_families, &handles, &ptr);
+  std::unique_ptr<rocksdb_prefix_wal_filter_t> wal_filter;
+
+  if (wal_filter_prefixes_len > 0 && !read_only) {
+    // Filtering WAL replay outside of read-only mode would permanently discard
+    // the unmatched records once the recovered memtable is flushed, so it is
+    // rejected rather than silently risking data loss.
+    status = Status::InvalidArgument("wal_filter_prefixes requires read_only");
   } else {
-    status = DB::Open(options, req->path, column_families, &handles, &ptr);
+    if (wal_filter_prefixes_len > 0) {
+      wal_filter = std::make_unique<rocksdb_prefix_wal_filter_t>(
+        wal_filter_prefixes, wal_filter_prefixes_len
+      );
+
+      options.wal_filter = wal_filter.get();
+    }
+
+    if (read_only) {
+      status = DB::OpenForReadOnly(options, req->path, column_families, &handles, &ptr);
+    } else {
+      status = DB::Open(options, req->path, column_families, &handles, &ptr);
+    }
   }
 
   auto db = req->req.db;
@@ -1199,6 +1410,13 @@ rocksdb_stats_level_set(rocksdb_t *db, rocksdb_stats_level_t level) {
   statistics->set_stats_level(rocksdb__from(level));
 
   return 0;
+}
+
+extern "C" void
+rocksdb_options_init(rocksdb_options_t *options, int version) {
+  memcpy(options, &rocksdb__default_options, rocksdb__options_size(version));
+
+  options->version = version;
 }
 
 extern "C" rocksdb_column_family_descriptor_t

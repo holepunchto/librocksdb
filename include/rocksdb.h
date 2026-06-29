@@ -73,7 +73,7 @@ typedef enum {
   rocksdb_stats_level_all = 5,
 } rocksdb_stats_level_t;
 
-/** @version 7 */
+/** @version 8 */
 struct rocksdb_options_s {
   int version;
 
@@ -130,6 +130,15 @@ struct rocksdb_options_s {
 
   /** @since 7 */
   uint64_t wal_size_limit_mb;
+
+  /** @since 8 */
+  bool avoid_flush_during_shutdown;
+
+  /** @since 8 */
+  const rocksdb_slice_t *wal_filter_prefixes;
+
+  /** @since 8 */
+  size_t wal_filter_prefixes_len;
 };
 
 typedef enum {
@@ -648,6 +657,9 @@ struct rocksdb_s {
 
   rocksdb_close_t *close;
 };
+
+void
+rocksdb_options_init(rocksdb_options_t *options, int version);
 
 int
 rocksdb_open(uv_loop_t *loop, rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_idle_cb idle, rocksdb_open_cb cb);
