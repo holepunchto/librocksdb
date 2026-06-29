@@ -661,6 +661,27 @@ struct rocksdb_s {
 void
 rocksdb_options_init(rocksdb_options_t *options, int version);
 
+void
+rocksdb_column_family_options_init(rocksdb_column_family_options_t *options, int version);
+
+void
+rocksdb_read_options_init(rocksdb_read_options_t *options, int version);
+
+void
+rocksdb_write_options_init(rocksdb_write_options_t *options, int version);
+
+void
+rocksdb_iterator_options_init(rocksdb_iterator_options_t *options, int version);
+
+void
+rocksdb_flush_options_init(rocksdb_flush_options_t *options, int version);
+
+void
+rocksdb_compact_range_options_init(rocksdb_compact_range_options_t *options, int version);
+
+void
+rocksdb_approximate_size_options_init(rocksdb_approximate_size_options_t *options, int version);
+
 int
 rocksdb_open(uv_loop_t *loop, rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_idle_cb idle, rocksdb_open_cb cb);
 
