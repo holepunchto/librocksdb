@@ -246,54 +246,82 @@ static const rocksdb_approximate_size_options_t rocksdb__default_approximate_siz
 
 namespace {
 
-template <auto rocksdb_options_t::*P, typename T>
+template <typename M>
+struct rocksdb__member_class;
+
+template <typename C, typename V>
+struct rocksdb__member_class<V C::*> {
+  using type = C;
+};
+
+template <auto P>
+using rocksdb__member_class_t = typename rocksdb__member_class<decltype(P)>::type;
+
+template <typename T>
+static const T &
+rocksdb__options_default();
+
+template <>
+inline const rocksdb_options_t &
+rocksdb__options_default() {
+  return rocksdb__default_options;
+}
+
+template <>
+inline const rocksdb_column_family_options_t &
+rocksdb__options_default() {
+  return rocksdb__default_column_family_options;
+}
+
+template <>
+inline const rocksdb_read_options_t &
+rocksdb__options_default() {
+  return rocksdb__default_read_options;
+}
+
+template <>
+inline const rocksdb_write_options_t &
+rocksdb__options_default() {
+  return rocksdb__default_write_options;
+}
+
+template <>
+inline const rocksdb_iterator_options_t &
+rocksdb__options_default() {
+  return rocksdb__default_iterator_options;
+}
+
+template <>
+inline const rocksdb_flush_options_t &
+rocksdb__options_default() {
+  return rocksdb__default_flush_options;
+}
+
+template <>
+inline const rocksdb_compact_range_options_t &
+rocksdb__options_default() {
+  return rocksdb__default_compact_range_options;
+}
+
+template <>
+inline const rocksdb_approximate_size_options_t &
+rocksdb__options_default() {
+  return rocksdb__default_approximate_size_options;
+}
+
+template <auto P, typename T>
 static inline T
-rocksdb__option(const rocksdb_options_t *options, int min_version, T fallback = T(rocksdb__default_options.*P)) {
+rocksdb__option(const rocksdb__member_class_t<P> *options, int min_version, T fallback = T(rocksdb__options_default<rocksdb__member_class_t<P>>().*P)) {
   return options->version >= min_version ? T(options->*P) : fallback;
 }
 
-template <auto rocksdb_column_family_options_t::*P, typename T>
-static inline T
-rocksdb__option(const rocksdb_column_family_options_t *options, int min_version, T fallback = T(rocksdb__default_column_family_options.*P)) {
-  return options->version >= min_version ? T(options->*P) : fallback;
-}
-
-template <auto rocksdb_iterator_options_t::*P, typename T>
-static inline T
-rocksdb__option(const rocksdb_iterator_options_t *options, int min_version, T fallback = T(rocksdb__default_iterator_options.*P)) {
-  return options->version >= min_version ? T(options->*P) : fallback;
-}
-
-template <auto rocksdb_read_options_t::*P, typename T>
-static inline T
-rocksdb__option(const rocksdb_read_options_t *options, int min_version, T fallback = T(rocksdb__default_read_options.*P)) {
-  return options->version >= min_version ? T(options->*P) : fallback;
-}
-
-template <auto rocksdb_write_options_t::*P, typename T>
-static inline T
-rocksdb__option(const rocksdb_write_options_t *options, int min_version, T fallback = T(rocksdb__default_write_options.*P)) {
-  return options->version >= min_version ? T(options->*P) : fallback;
-}
-
-template <auto rocksdb_compact_range_options_t::*P, typename T>
-static inline T
-rocksdb__option(const rocksdb_compact_range_options_t *options, int min_version, T fallback = T(rocksdb__default_compact_range_options.*P)) {
-  return options->version >= min_version ? T(options->*P) : fallback;
-}
-
-template <auto rocksdb_approximate_size_options_t::*P, typename T>
-static inline T
-rocksdb__option(const rocksdb_approximate_size_options_t *options, int min_version, T fallback = T(rocksdb__default_approximate_size_options.*P)) {
-  return options->version >= min_version ? T(options->*P) : fallback;
-}
-
-// Returns the number of bytes of `rocksdb_options_t` that are valid for a
-// struct declaring the given ABI `version`. Fields are only ever appended, so
-// a caller compiled against an older version provides a shorter struct; copying
-// any more than this would read past the end of its allocation.
+template <typename T>
 static inline size_t
-rocksdb__options_size(int version) {
+rocksdb__options_size(int version);
+
+template <>
+inline size_t
+rocksdb__options_size<rocksdb_options_t>(int version) {
   switch (version) {
   case 0:
     return offsetof(rocksdb_options_t, max_open_files);
@@ -316,8 +344,9 @@ rocksdb__options_size(int version) {
   }
 }
 
-static inline size_t
-rocksdb__column_family_options_size(int version) {
+template <>
+inline size_t
+rocksdb__options_size<rocksdb_column_family_options_t>(int version) {
   switch (version) {
   case 0:
     return offsetof(rocksdb_column_family_options_t, optimize_filters_for_memory);
@@ -334,8 +363,9 @@ rocksdb__column_family_options_size(int version) {
   }
 }
 
-static inline size_t
-rocksdb__read_options_size(int version) {
+template <>
+inline size_t
+rocksdb__options_size<rocksdb_read_options_t>(int version) {
   switch (version) {
   case 0:
     return offsetof(rocksdb_read_options_t, async_io);
@@ -344,14 +374,65 @@ rocksdb__read_options_size(int version) {
   }
 }
 
-static inline size_t
-rocksdb__compact_range_options_size(int version) {
+template <>
+inline size_t
+rocksdb__options_size<rocksdb_write_options_t>(int version) {
+  switch (version) {
+  default:
+    return sizeof(rocksdb_write_options_t);
+  }
+}
+
+template <>
+inline size_t
+rocksdb__options_size<rocksdb_iterator_options_t>(int version) {
+  switch (version) {
+  default:
+    return sizeof(rocksdb_iterator_options_t);
+  }
+}
+
+template <>
+inline size_t
+rocksdb__options_size<rocksdb_flush_options_t>(int version) {
+  switch (version) {
+  default:
+    return sizeof(rocksdb_flush_options_t);
+  }
+}
+
+template <>
+inline size_t
+rocksdb__options_size<rocksdb_compact_range_options_t>(int version) {
   switch (version) {
   case 0:
     return offsetof(rocksdb_compact_range_options_t, blob_garbage_collection_policy);
   default:
     return sizeof(rocksdb_compact_range_options_t);
   }
+}
+
+template <>
+inline size_t
+rocksdb__options_size<rocksdb_approximate_size_options_t>(int version) {
+  switch (version) {
+  default:
+    return sizeof(rocksdb_approximate_size_options_t);
+  }
+}
+
+template <typename T>
+static inline size_t
+rocksdb__options_size(const T *options) {
+  return rocksdb__options_size<T>(options->version);
+}
+
+template <typename T>
+static inline void
+rocksdb__options_init(T *options, int version) {
+  memcpy(options, &rocksdb__options_default<T>(), rocksdb__options_size<T>(version));
+
+  options->version = version;
 }
 
 } // namespace
@@ -677,6 +758,50 @@ private:
     }
   };
 };
+
+} // namespace
+
+extern "C" void
+rocksdb_options_init(rocksdb_options_t *options, int version) {
+  rocksdb__options_init(options, version);
+}
+
+extern "C" void
+rocksdb_column_family_options_init(rocksdb_column_family_options_t *options, int version) {
+  rocksdb__options_init(options, version);
+}
+
+extern "C" void
+rocksdb_read_options_init(rocksdb_read_options_t *options, int version) {
+  rocksdb__options_init(options, version);
+}
+
+extern "C" void
+rocksdb_write_options_init(rocksdb_write_options_t *options, int version) {
+  rocksdb__options_init(options, version);
+}
+
+extern "C" void
+rocksdb_iterator_options_init(rocksdb_iterator_options_t *options, int version) {
+  rocksdb__options_init(options, version);
+}
+
+extern "C" void
+rocksdb_flush_options_init(rocksdb_flush_options_t *options, int version) {
+  rocksdb__options_init(options, version);
+}
+
+extern "C" void
+rocksdb_compact_range_options_init(rocksdb_compact_range_options_t *options, int version) {
+  rocksdb__options_init(options, version);
+}
+
+extern "C" void
+rocksdb_approximate_size_options_init(rocksdb_approximate_size_options_t *options, int version) {
+  rocksdb__options_init(options, version);
+}
+
+namespace {
 
 static inline void
 rocksdb__on_after_open(uv_work_t *handle, int status) {
@@ -1068,7 +1193,7 @@ rocksdb_open(uv_loop_t *loop, rocksdb_t *db, rocksdb_open_t *req, const char *pa
 
   req->options = rocksdb__default_options;
 
-  if (options) memcpy(&req->options, options, rocksdb__options_size(options->version));
+  if (options) memcpy(&req->options, options, rocksdb__options_size(options));
 
   req->column_families = column_families;
   req->handles = handles;
@@ -1412,13 +1537,6 @@ rocksdb_stats_level_set(rocksdb_t *db, rocksdb_stats_level_t level) {
   return 0;
 }
 
-extern "C" void
-rocksdb_options_init(rocksdb_options_t *options, int version) {
-  memcpy(options, &rocksdb__default_options, rocksdb__options_size(version));
-
-  options->version = version;
-}
-
 extern "C" rocksdb_column_family_descriptor_t
 rocksdb_column_family_descriptor(const char *name, const rocksdb_column_family_options_t *options) {
   rocksdb_column_family_descriptor_t descriptor;
@@ -1427,7 +1545,7 @@ rocksdb_column_family_descriptor(const char *name, const rocksdb_column_family_o
   descriptor.options = rocksdb__default_column_family_options;
 
   if (options) {
-    memcpy(&descriptor.options, options, rocksdb__column_family_options_size(options->version));
+    memcpy(&descriptor.options, options, rocksdb__options_size(options));
   }
 
   return descriptor;
@@ -1722,7 +1840,10 @@ rocksdb_iterator_open(rocksdb_t *db, rocksdb_iterator_t *req, rocksdb_column_fam
   }
 
   req->req.db = db;
-  req->options = options ? *options : rocksdb__default_iterator_options;
+  req->options = rocksdb__default_iterator_options;
+
+  if (options) memcpy(&req->options, options, rocksdb__options_size(options));
+
   req->column_family = column_family;
   req->handle = nullptr;
   req->range = range;
@@ -1838,7 +1959,10 @@ rocksdb_iterator_refresh(rocksdb_iterator_t *req, rocksdb_range_t range, const r
     return UV_EINVAL;
   }
 
-  req->options = options ? *options : rocksdb__default_iterator_options;
+  req->options = rocksdb__default_iterator_options;
+
+  if (options) memcpy(&req->options, options, rocksdb__options_size(options));
+
   req->range = range;
   req->inflight = true;
   req->error = nullptr;
@@ -2016,7 +2140,7 @@ rocksdb_read(rocksdb_t *db, rocksdb_read_batch_t *req, rocksdb_read_t *reads, si
   req->req.db = db;
   req->options = rocksdb__default_read_options;
 
-  if (options) memcpy(&req->options, options, rocksdb__read_options_size(options->version));
+  if (options) memcpy(&req->options, options, rocksdb__options_size(options));
 
   req->reads = reads;
   req->errors = nullptr;
@@ -2111,7 +2235,10 @@ rocksdb_write(rocksdb_t *db, rocksdb_write_batch_t *req, rocksdb_write_t *writes
   }
 
   req->req.db = db;
-  req->options = options ? *options : rocksdb__default_write_options;
+  req->options = rocksdb__default_write_options;
+
+  if (options) memcpy(&req->options, options, rocksdb__options_size(options));
+
   req->writes = writes;
   req->error = nullptr;
   req->len = len;
@@ -2177,7 +2304,10 @@ rocksdb_flush(rocksdb_t *db, rocksdb_flush_t *req, rocksdb_column_family_t *colu
 
   req->req.db = db;
   req->column_family = column_family;
-  req->options = options ? *options : rocksdb__default_flush_options;
+  req->options = rocksdb__default_flush_options;
+
+  if (options) memcpy(&req->options, options, rocksdb__options_size(options));
+
   req->error = nullptr;
   req->cb = cb;
 
@@ -2266,7 +2396,10 @@ rocksdb_compact(rocksdb_t *db, rocksdb_compact_t *req, rocksdb_column_family_t *
 
   req->req.db = db;
   req->column_family = column_family;
-  req->options = options ? *options : rocksdb__default_compact_range_options;
+  req->options = rocksdb__default_compact_range_options;
+
+  if (options) memcpy(&req->options, options, rocksdb__options_size(options));
+
   req->error = nullptr;
   req->cb = cb;
 
@@ -2362,7 +2495,7 @@ rocksdb_compact_range(rocksdb_t *db, rocksdb_compact_range_t *req, rocksdb_colum
   req->end = end;
   req->options = rocksdb__default_compact_range_options;
 
-  if (options) memcpy(&req->options, options, rocksdb__compact_range_options_size(options->version));
+  if (options) memcpy(&req->options, options, rocksdb__options_size(options));
 
   req->error = nullptr;
   req->cb = cb;
@@ -2453,7 +2586,10 @@ rocksdb_approximate_size(rocksdb_t *db, rocksdb_approximate_size_t *req, rocksdb
   req->column_family = column_family;
   req->start = start;
   req->end = end;
-  req->options = options ? *options : rocksdb__default_approximate_size_options;
+  req->options = rocksdb__default_approximate_size_options;
+
+  if (options) memcpy(&req->options, options, rocksdb__options_size(options));
+
   req->error = nullptr;
   req->cb = cb;
 
