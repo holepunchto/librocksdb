@@ -1537,6 +1537,21 @@ rocksdb_stats_level_set(rocksdb_t *db, rocksdb_stats_level_t level) {
   return 0;
 }
 
+extern "C" int
+rocksdb_property_value(rocksdb_t *db, const char *name, rocksdb_slice_t *value) {
+  auto handle = reinterpret_cast<DB *>(db->handle);
+
+  std::string property;
+  if (!handle->GetProperty(name, &property)) {
+    *value = rocksdb_slice_empty();
+    return UV_ENOENT;
+  }
+
+  *value = rocksdb_slice_init(strdup(property.c_str()), property.size());
+
+  return 0;
+}
+
 extern "C" rocksdb_column_family_descriptor_t
 rocksdb_column_family_descriptor(const char *name, const rocksdb_column_family_options_t *options) {
   rocksdb_column_family_descriptor_t descriptor;
