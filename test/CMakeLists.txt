@@ -17,6 +17,7 @@ list(APPEND tests
   write-read
   write-read-snapshot
   write-read-sync
+  property-get
 )
 
 foreach(test IN LISTS tests)

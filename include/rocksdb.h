@@ -712,6 +712,9 @@ rocksdb_stats_level_get(rocksdb_t *db, rocksdb_stats_level_t *level);
 int
 rocksdb_stats_level_set(rocksdb_t *db, rocksdb_stats_level_t level);
 
+int
+rocksdb_property_get(rocksdb_t *db, const char *name, rocksdb_slice_t *value);
+
 rocksdb_column_family_descriptor_t
 rocksdb_column_family_descriptor(const char *name, const rocksdb_column_family_options_t *options);
 
