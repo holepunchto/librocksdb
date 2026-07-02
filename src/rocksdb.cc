@@ -1538,16 +1538,18 @@ rocksdb_stats_level_set(rocksdb_t *db, rocksdb_stats_level_t level) {
 }
 
 extern "C" int
-rocksdb_property_value(rocksdb_t *db, const char *name, rocksdb_slice_t *value) {
+rocksdb_property_get(rocksdb_t *db, const char *name, rocksdb_slice_t *value) {
   auto handle = reinterpret_cast<DB *>(db->handle);
 
   std::string property;
   if (!handle->GetProperty(name, &property)) {
-    *value = rocksdb_slice_empty();
     return UV_ENOENT;
   }
 
-  *value = rocksdb_slice_init(strdup(property.c_str()), property.size());
+  auto data = malloc(property.size());
+  memcpy(data, property.data(), property.size());
+
+  *value = rocksdb_slice_init(static_cast<char *>(data), property.size());
 
   return 0;
 }
