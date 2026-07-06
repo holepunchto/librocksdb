@@ -395,7 +395,11 @@ public:
 
   rocksdb_file_system_t(const rocksdb_file_system_t &) = delete;
 
-  ~rocksdb_file_system_t() override {}
+  ~rocksdb_file_system_t() override {
+    for (const auto &lock : locks) {
+      delete lock;
+    }
+  }
 
   inline void
   suspend() {
@@ -491,7 +495,11 @@ private:
 
     if (wrapper->held()) status = wrapper->release(fs);
 
-    if (status.ok()) locks.erase(wrapper);
+    if (status.ok()) {
+      locks.erase(wrapper);
+
+      delete wrapper;
+    }
 
     return status;
   }
