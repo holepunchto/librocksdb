@@ -203,7 +203,7 @@ static const rocksdb_column_family_options_t rocksdb__default_column_family_opti
   .max_write_buffer_number = 2,
   .blob_garbage_collection_age_cutoff = 0.25,
   .blob_garbage_collection_force_threshold = 1.0,
-  .write_buffer_size = 64 << 20,
+  .write_buffer_size = 64 * 1024 * 1024,
 };
 
 static const rocksdb_iterator_options_t rocksdb__default_iterator_options = {
