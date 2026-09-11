@@ -181,7 +181,7 @@ static const rocksdb_options_t rocksdb__default_options = {
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
-  .version = 5,
+  .version = 6,
   .compaction_style = rocksdb_level_compaction,
   .enable_blob_files = false,
   .min_blob_size = 0,
@@ -202,7 +202,8 @@ static const rocksdb_column_family_options_t rocksdb__default_column_family_opti
   .num_levels = 7,
   .max_write_buffer_number = 2,
   .blob_garbage_collection_age_cutoff = 0.25,
-  .blob_garbage_collection_force_threshold = 1.0
+  .blob_garbage_collection_force_threshold = 1.0,
+  .write_buffer_size = 64 << 20,
 };
 
 static const rocksdb_iterator_options_t rocksdb__default_iterator_options = {
@@ -358,6 +359,8 @@ rocksdb__options_size<rocksdb_column_family_options_t>(int version) {
     return offsetof(rocksdb_column_family_options_t, optimize_filters_for_hits);
   case 4:
     return offsetof(rocksdb_column_family_options_t, blob_garbage_collection_age_cutoff);
+  case 5:
+    return offsetof(rocksdb_column_family_options_t, write_buffer_size);
   default:
     return sizeof(rocksdb_column_family_options_t);
   }
@@ -1072,6 +1075,10 @@ rocksdb__on_open(uv_work_t *handle) {
 
     options.blob_garbage_collection_force_threshold = rocksdb__option<&rocksdb_column_family_options_t::blob_garbage_collection_force_threshold, double>(
       &column_family.options, 5
+    );
+
+    options.write_buffer_size = rocksdb__option<&rocksdb_column_family_options_t::write_buffer_size, uint64_t>(
+      &column_family.options, 6
     );
 
     options.table_factory = std::shared_ptr<TableFactory>(NewBlockBasedTableFactory(table_options));
