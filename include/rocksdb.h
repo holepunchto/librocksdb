@@ -200,7 +200,7 @@ struct rocksdb_filter_policy_s {
   };
 };
 
-/** @version 5 */
+/** @version 6 */
 struct rocksdb_column_family_options_s {
   int version;
 
@@ -260,6 +260,9 @@ struct rocksdb_column_family_options_s {
 
   /** @since 5 */
   double blob_garbage_collection_force_threshold;
+
+  /** @since 6 */
+  uint64_t write_buffer_size;
 };
 
 /** @version 1 */

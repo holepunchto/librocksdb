@@ -1,5 +1,6 @@
 list(APPEND tests
   approximate-size
+  column-family-write-buffer-size
   compact
   compact-range
   compact-range-blobs
