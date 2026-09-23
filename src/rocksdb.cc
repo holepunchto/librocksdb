@@ -1591,6 +1591,23 @@ rocksdb_column_family_destroy(rocksdb_t *db, rocksdb_column_family_t *column_fam
   return status.ok() ? 0 : -1;
 }
 
+extern "C" int
+rocksdb_column_family_property_get(rocksdb_t *db, rocksdb_column_family_t *column_family, const char *name, rocksdb_slice_t *value) {
+  auto handle = reinterpret_cast<DB *>(db->handle);
+
+  std::string property;
+  if (!handle->GetProperty(reinterpret_cast<ColumnFamilyHandle *>(column_family), name, &property)) {
+    return UV_ENOENT;
+  }
+
+  auto data = malloc(property.size());
+  memcpy(data, property.data(), property.size());
+
+  *value = rocksdb_slice_init(static_cast<char *>(data), property.size());
+
+  return 0;
+}
+
 extern "C" rocksdb_slice_t
 rocksdb_slice_init(const char *data, size_t len) {
   return {.data = data, .len = len};
