@@ -1,15 +1,54 @@
 #include <assert.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 #include <uv.h>
 
 #include "../include/rocksdb.h"
+
+static void
+remove_database(const char *path) {
+  int e;
+
+  uv_fs_t scandir;
+  e = uv_fs_scandir(NULL, &scandir, path, 0, NULL);
+
+  if (e < 0) {
+    uv_fs_req_cleanup(&scandir);
+    return;
+  }
+
+  uv_dirent_t entry;
+
+  while (uv_fs_scandir_next(&scandir, &entry) == 0) {
+    char child[4096];
+    snprintf(child, sizeof(child), "%s/%s", path, entry.name);
+
+    uv_fs_t unlink;
+    e = uv_fs_unlink(NULL, &unlink, child, NULL);
+    assert(e == 0);
+
+    uv_fs_req_cleanup(&unlink);
+  }
+
+  uv_fs_req_cleanup(&scandir);
+
+  uv_fs_t remove;
+  e = uv_fs_rmdir(NULL, &remove, path, NULL);
+  assert(e == 0);
+
+  uv_fs_req_cleanup(&remove);
+}
 
 int
 main() {
   int e;
 
   uv_loop_t *loop = uv_default_loop();
+
+  // Opening a database left behind by an earlier run flushes its recovered WAL
+  // into a table file, putting the keys out of reach of the filter.
+  remove_database("test/fixtures/read-only-wal-filter.db");
 
   // Write two keys with distinct prefixes and leave them in the WAL by avoiding
   // the flush that a clean close would otherwise perform.
