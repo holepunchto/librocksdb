@@ -727,6 +727,9 @@ rocksdb_column_family_default(rocksdb_t *db);
 int
 rocksdb_column_family_destroy(rocksdb_t *db, rocksdb_column_family_t *column_family);
 
+int
+rocksdb_column_family_property_get(rocksdb_t *db, rocksdb_column_family_t *column_family, const char *name, rocksdb_slice_t *value);
+
 rocksdb_slice_t
 rocksdb_slice_init(const char *data, size_t len);
 
