@@ -41,6 +41,7 @@ typedef struct rocksdb_compact_range_s rocksdb_compact_range_t;
 typedef struct rocksdb_approximate_size_s rocksdb_approximate_size_t;
 typedef struct rocksdb_wal_file_s rocksdb_wal_file_t;
 typedef struct rocksdb_current_wal_file_s rocksdb_current_wal_file_t;
+typedef struct rocksdb_flush_wal_s rocksdb_flush_wal_t;
 typedef struct rocksdb_s rocksdb_t;
 
 typedef void (*rocksdb_idle_cb)(rocksdb_t *db);
@@ -56,6 +57,7 @@ typedef void (*rocksdb_compact_cb)(rocksdb_compact_t *req, int status);
 typedef void (*rocksdb_compact_range_cb)(rocksdb_compact_range_t *req, int status);
 typedef void (*rocksdb_approximate_size_cb)(rocksdb_approximate_size_t *req, int status);
 typedef void (*rocksdb_current_wal_file_cb)(rocksdb_current_wal_file_t *req, int status);
+typedef void (*rocksdb_flush_wal_cb)(rocksdb_flush_wal_t *req, int status);
 
 typedef enum {
   rocksdb_tolerate_corrupted_tail_records_recovery_mode = 0,
@@ -629,6 +631,19 @@ struct rocksdb_current_wal_file_s {
   void *data;
 };
 
+struct rocksdb_flush_wal_s {
+  rocksdb_req_t req;
+
+  bool sync;
+
+  char *error;
+  int status;
+
+  rocksdb_flush_wal_cb cb;
+
+  void *data;
+};
+
 struct rocksdb_snapshot_s {
   rocksdb_t *db;
 
@@ -795,6 +810,12 @@ rocksdb_current_wal_file(rocksdb_t *db, rocksdb_current_wal_file_t *req, rocksdb
 
 void
 rocksdb_current_wal_file_cleanup(rocksdb_current_wal_file_t *req);
+
+int
+rocksdb_flush_wal(rocksdb_t *db, rocksdb_flush_wal_t *req, bool sync, rocksdb_flush_wal_cb cb);
+
+void
+rocksdb_flush_wal_cleanup(rocksdb_flush_wal_t *req);
 
 int
 rocksdb_snapshot_create(rocksdb_t *db, rocksdb_snapshot_t *snapshot);

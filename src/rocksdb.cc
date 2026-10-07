@@ -2724,6 +2724,65 @@ rocksdb_current_wal_file_cleanup(rocksdb_current_wal_file_t *req) {
   }
 }
 
+namespace {
+
+static void
+rocksdb__on_after_flush_wal(uv_work_t *handle, int status) {
+  int err;
+
+  auto req = reinterpret_cast<rocksdb_flush_wal_t *>(handle->data);
+
+  err = rocksdb__remove_req(req);
+  assert(err == 0);
+
+  if (req->cb) req->cb(req, status);
+}
+
+static void
+rocksdb__on_flush_wal(uv_work_t *handle) {
+  auto req = reinterpret_cast<rocksdb_flush_wal_t *>(handle->data);
+
+  auto db = reinterpret_cast<DB *>(req->req.db->handle);
+
+  auto status = db->FlushWAL(req->sync);
+
+  if (status.ok()) {
+    req->error = nullptr;
+    req->status = 0;
+  } else {
+    req->error = strdup(status.getState());
+    req->status = rocksdb__status(status);
+  }
+}
+
+} // namespace
+
+extern "C" int
+rocksdb_flush_wal(rocksdb_t *db, rocksdb_flush_wal_t *req, bool sync, rocksdb_flush_wal_cb cb) {
+  if (db->state != rocksdb_active) {
+    return UV_EINVAL;
+  }
+
+  req->req.db = db;
+  req->sync = sync;
+  req->error = nullptr;
+  req->cb = cb;
+
+  req->req.worker.data = static_cast<void *>(req);
+
+  rocksdb__add_req(req);
+
+  return rocksdb__queue_work(cb ? rocksdb_async : rocksdb_sync, req->req.db->loop, req, rocksdb__on_flush_wal, rocksdb__on_after_flush_wal);
+}
+
+extern "C" void
+rocksdb_flush_wal_cleanup(rocksdb_flush_wal_t *req) {
+  if (req->error) {
+    free(req->error);
+    req->error = nullptr;
+  }
+}
+
 extern "C" int
 rocksdb_snapshot_create(rocksdb_t *db, rocksdb_snapshot_t *snapshot) {
   auto handle = reinterpret_cast<DB *>(db->handle)->GetSnapshot();
