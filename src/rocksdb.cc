@@ -1801,7 +1801,9 @@ rocksdb__iterator_read(Iterator *iterator, rocksdb_iterator_t *req) {
 
     req->keys[i] = rocksdb__slice_copy(iterator->key());
 
-    if (!req->options.keys_only) {
+    if (req->options.keys_only) {
+      req->values[i] = rocksdb_slice_empty();
+    } else {
       req->values[i] = rocksdb__slice_copy(iterator->value());
     }
 
