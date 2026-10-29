@@ -76,6 +76,13 @@ target_link_libraries(
     rocksdb_facebook
 )
 
+target_compile_definitions(
+  rocksdb
+  PRIVATE
+    _GNU_SOURCE
+    _FILE_OFFSET_BITS=64
+)
+
 if(WIN32)
   target_compile_options(
     rocksdb
