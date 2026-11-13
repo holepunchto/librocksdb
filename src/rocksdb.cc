@@ -1086,7 +1086,6 @@ rocksdb__on_open(uv_work_t *handle) {
     column_families[i] = ColumnFamilyDescriptor(column_family.name, options);
   }
 
-  // freed on return unless open succeeds
   auto env = NewCompositeEnv(std::make_shared<rocksdb_file_system_t>());
 
   options.env = env.get();
@@ -1125,7 +1124,7 @@ rocksdb__on_open(uv_work_t *handle) {
   db->read_only = read_only;
 
   if (status.ok()) {
-    env.release(); // freed in rocksdb__on_close()
+    env.release();
 
     db->handle = ptr.release();
     db->lock = lock;

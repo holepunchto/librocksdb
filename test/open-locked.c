@@ -25,7 +25,7 @@ main() {
   assert(open.error == NULL);
   rocksdb_open_cleanup(&open);
 
-  // fails on the lock held by the first open
+  // Fails on the lock held by the first open.
   {
     rocksdb_t db;
     rocksdb_column_family_t *family;
