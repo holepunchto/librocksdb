@@ -138,8 +138,13 @@ install(TARGETS rocksdb_shared rocksdb_static)
 install(FILES include/rocksdb.h DESTINATION include)
 
 if(PROJECT_IS_TOP_LEVEL)
+  set(BENCH OFF CACHE BOOL "Build the benchmarks")
+
   enable_testing()
 
-  add_subdirectory(bench)
+  if(BENCH)
+    add_subdirectory(bench)
+  endif()
+
   add_subdirectory(test)
 endif()
