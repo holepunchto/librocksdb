@@ -14,6 +14,7 @@ list(APPEND tests
   open-close
   open-close-immediately
   open-close-sync
+  open-locked
   read-only-wal-filter
   write-flush
   write-read
