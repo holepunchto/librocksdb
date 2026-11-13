@@ -1088,7 +1088,7 @@ rocksdb__on_open(uv_work_t *handle) {
 
   auto env = NewCompositeEnv(std::make_shared<rocksdb_file_system_t>());
 
-  options.env = env.release();
+  options.env = env.get();
 
   auto handles = std::vector<ColumnFamilyHandle *>(req->len);
 
@@ -1124,6 +1124,8 @@ rocksdb__on_open(uv_work_t *handle) {
   db->read_only = read_only;
 
   if (status.ok()) {
+    env.release();
+
     db->handle = ptr.release();
     db->lock = lock;
 
