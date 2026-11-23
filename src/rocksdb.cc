@@ -1190,6 +1190,8 @@ rocksdb__on_open(uv_work_t *handle) {
 
 extern "C" int
 rocksdb_open(uv_loop_t *loop, rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_idle_cb idle, rocksdb_open_cb cb) {
+  if (strlen(path) >= sizeof(req->path)) return UV_ENAMETOOLONG;
+
   db->loop = loop;
   db->handle = nullptr;
   db->state = 0;
