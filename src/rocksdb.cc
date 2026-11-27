@@ -2,6 +2,7 @@
 #include <vector>
 
 #include <rocksdb/advanced_options.h>
+#include <rocksdb/cache.h>
 #include <rocksdb/convenience.h>
 #include <rocksdb/db.h>
 #include <rocksdb/filter_policy.h>
@@ -156,7 +157,7 @@ rocksdb__from(WalFileType type) {
 namespace {
 
 static const rocksdb_options_t rocksdb__default_options = {
-  .version = 8,
+  .version = 9,
   .read_only = false,
   .create_if_missing = false,
   .create_missing_column_families = false,
@@ -177,7 +178,10 @@ static const rocksdb_options_t rocksdb__default_options = {
   .wal_size_limit_mb = 0,
   .avoid_flush_during_shutdown = false,
   .wal_filter_prefixes = nullptr,
-  .wal_filter_prefixes_len = 0
+  .wal_filter_prefixes_len = 0,
+  .block_cache = (rocksdb_cache_t) {
+    .type = rocksdb_default_cache,
+  },
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
@@ -241,6 +245,34 @@ static const rocksdb_approximate_size_options_t rocksdb__default_approximate_siz
   .include_memtables = false,
   .include_files = true,
   .files_size_error_margin = -1.0,
+};
+
+static const rocksdb_bloom_filter_options_t rocksdb__default_bloom_filter_options = {
+  .version = 0,
+  .bits_per_key = 10.0,
+};
+
+static const rocksdb_ribbon_filter_options_t rocksdb__default_ribbon_filter_options = {
+  .version = 0,
+  .bloom_equivalent_bits_per_key = 10.0,
+  .bloom_before_level = 0,
+};
+
+static const rocksdb_lru_cache_options_t rocksdb__default_lru_cache_options = {
+  .version = 0,
+  .capacity = 32 * 1024 * 1024,
+  .num_shard_bits = -1,
+  .strict_capacity_limit = false,
+  .high_pri_pool_ratio = 0.5,
+  .low_pri_pool_ratio = 0.0,
+};
+
+static const rocksdb_hyper_clock_cache_options_t rocksdb__default_hyper_clock_cache_options = {
+  .version = 0,
+  .capacity = 32 * 1024 * 1024,
+  .estimated_entry_charge = 0,
+  .num_shard_bits = -1,
+  .strict_capacity_limit = false,
 };
 
 } // namespace
@@ -310,6 +342,30 @@ rocksdb__options_default() {
   return rocksdb__default_approximate_size_options;
 }
 
+template <>
+inline const rocksdb_bloom_filter_options_t &
+rocksdb__options_default() {
+  return rocksdb__default_bloom_filter_options;
+}
+
+template <>
+inline const rocksdb_ribbon_filter_options_t &
+rocksdb__options_default() {
+  return rocksdb__default_ribbon_filter_options;
+}
+
+template <>
+inline const rocksdb_lru_cache_options_t &
+rocksdb__options_default() {
+  return rocksdb__default_lru_cache_options;
+}
+
+template <>
+inline const rocksdb_hyper_clock_cache_options_t &
+rocksdb__options_default() {
+  return rocksdb__default_hyper_clock_cache_options;
+}
+
 template <auto P, typename T>
 static inline T
 rocksdb__option(const rocksdb__member_class_t<P> *options, int min_version, T fallback = T(rocksdb__options_default<rocksdb__member_class_t<P>>().*P)) {
@@ -340,6 +396,8 @@ rocksdb__options_size<rocksdb_options_t>(int version) {
     return offsetof(rocksdb_options_t, wal_ttl_seconds);
   case 7:
     return offsetof(rocksdb_options_t, avoid_flush_during_shutdown);
+  case 8:
+    return offsetof(rocksdb_options_t, block_cache);
   default:
     return sizeof(rocksdb_options_t);
   }
@@ -421,6 +479,42 @@ rocksdb__options_size<rocksdb_approximate_size_options_t>(int version) {
   switch (version) {
   default:
     return sizeof(rocksdb_approximate_size_options_t);
+  }
+}
+
+template <>
+inline size_t
+rocksdb__options_size<rocksdb_bloom_filter_options_t>(int version) {
+  switch (version) {
+  default:
+    return sizeof(rocksdb_bloom_filter_options_t);
+  }
+}
+
+template <>
+inline size_t
+rocksdb__options_size<rocksdb_ribbon_filter_options_t>(int version) {
+  switch (version) {
+  default:
+    return sizeof(rocksdb_ribbon_filter_options_t);
+  }
+}
+
+template <>
+inline size_t
+rocksdb__options_size<rocksdb_lru_cache_options_t>(int version) {
+  switch (version) {
+  default:
+    return sizeof(rocksdb_lru_cache_options_t);
+  }
+}
+
+template <>
+inline size_t
+rocksdb__options_size<rocksdb_hyper_clock_cache_options_t>(int version) {
+  switch (version) {
+  default:
+    return sizeof(rocksdb_hyper_clock_cache_options_t);
   }
 }
 
@@ -804,6 +898,26 @@ rocksdb_approximate_size_options_init(rocksdb_approximate_size_options_t *option
   rocksdb__options_init(options, version);
 }
 
+extern "C" void
+rocksdb_bloom_filter_options_init(rocksdb_bloom_filter_options_t *options, int version) {
+  rocksdb__options_init(options, version);
+}
+
+extern "C" void
+rocksdb_ribbon_filter_options_init(rocksdb_ribbon_filter_options_t *options, int version) {
+  rocksdb__options_init(options, version);
+}
+
+extern "C" void
+rocksdb_lru_cache_options_init(rocksdb_lru_cache_options_t *options, int version) {
+  rocksdb__options_init(options, version);
+}
+
+extern "C" void
+rocksdb_hyper_clock_cache_options_init(rocksdb_hyper_clock_cache_options_t *options, int version) {
+  rocksdb__options_init(options, version);
+}
+
 namespace {
 
 static inline void
@@ -967,6 +1081,45 @@ rocksdb__on_open(uv_work_t *handle) {
 
   auto column_families = std::vector<ColumnFamilyDescriptor>(req->len);
 
+  // Created once and shared by every column family, as the default is a
+  // separate cache per column family with no way to bound the total.
+  std::shared_ptr<Cache> block_cache;
+
+  auto block_cache_options = rocksdb__option<&rocksdb_options_t::block_cache, rocksdb_cache_t>(
+    &req->options, 9
+  );
+
+  switch (block_cache_options.type) {
+  case rocksdb_lru_cache: {
+    auto &lru = block_cache_options.lru;
+
+    LRUCacheOptions options;
+    options.capacity = lru.capacity;
+    options.num_shard_bits = lru.num_shard_bits;
+    options.strict_capacity_limit = lru.strict_capacity_limit;
+    options.high_pri_pool_ratio = lru.high_pri_pool_ratio;
+    options.low_pri_pool_ratio = lru.low_pri_pool_ratio;
+
+    block_cache = options.MakeSharedCache();
+    break;
+  }
+
+  case rocksdb_hyper_clock_cache: {
+    auto &hyper_clock = block_cache_options.hyper_clock;
+
+    HyperClockCacheOptions options(hyper_clock.capacity, hyper_clock.estimated_entry_charge);
+    options.num_shard_bits = hyper_clock.num_shard_bits;
+    options.strict_capacity_limit = hyper_clock.strict_capacity_limit;
+
+    block_cache = options.MakeSharedCache();
+    break;
+  }
+
+  case rocksdb_default_cache:
+  default:
+    break;
+  }
+
   for (size_t i = 0, n = req->len; i < n; i++) {
     auto &column_family = req->column_families[i];
 
@@ -1015,6 +1168,10 @@ rocksdb__on_open(uv_work_t *handle) {
     table_options.no_block_cache = rocksdb__option<&rocksdb_column_family_options_t::no_block_cache, bool>(
       &column_family.options, 1
     );
+
+    if (block_cache && !table_options.no_block_cache) {
+      table_options.block_cache = block_cache;
+    }
 
     auto filter_policy = rocksdb__option<&rocksdb_column_family_options_t::filter_policy, rocksdb_filter_policy_t>(
       &column_family.options, 2

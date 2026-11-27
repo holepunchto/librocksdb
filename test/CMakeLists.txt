@@ -1,5 +1,6 @@
 list(APPEND tests
   approximate-size
+  block-cache
   column-family-property-get
   column-family-write-buffer-size
   compact

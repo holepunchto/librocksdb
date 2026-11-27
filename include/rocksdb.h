@@ -10,6 +10,9 @@ extern "C" {
 #include <uv.h>
 
 typedef struct rocksdb_options_s rocksdb_options_t;
+typedef struct rocksdb_lru_cache_options_s rocksdb_lru_cache_options_t;
+typedef struct rocksdb_hyper_clock_cache_options_s rocksdb_hyper_clock_cache_options_t;
+typedef struct rocksdb_cache_s rocksdb_cache_t;
 typedef struct rocksdb_bloom_filter_options_s rocksdb_bloom_filter_options_t;
 typedef struct rocksdb_ribbon_filter_options_s rocksdb_ribbon_filter_options_t;
 typedef struct rocksdb_filter_policy_s rocksdb_filter_policy_t;
@@ -75,7 +78,74 @@ typedef enum {
   rocksdb_stats_level_all = 5,
 } rocksdb_stats_level_t;
 
-/** @version 8 */
+typedef enum {
+  rocksdb_default_cache = 0,
+  rocksdb_lru_cache = 1,
+  rocksdb_hyper_clock_cache = 2,
+} rocksdb_cache_type_t;
+
+/** @version 0 */
+struct rocksdb_lru_cache_options_s {
+  int version;
+
+  /** @since 0 */
+  uint64_t capacity;
+
+  /**
+   * The cache is split into 2^num_shard_bits shards. A negative value lets
+   * RocksDB pick.
+   *
+   * @since 0
+   */
+  int num_shard_bits;
+
+  /** @since 0 */
+  bool strict_capacity_limit;
+
+  /** @since 0 */
+  double high_pri_pool_ratio;
+
+  /** @since 0 */
+  double low_pri_pool_ratio;
+};
+
+/** @version 0 */
+struct rocksdb_hyper_clock_cache_options_s {
+  int version;
+
+  /** @since 0 */
+  uint64_t capacity;
+
+  /**
+   * The expected average charge of a cache entry. Zero lets the cache adapt
+   * to the actual entries.
+   *
+   * @since 0
+   */
+  uint64_t estimated_entry_charge;
+
+  /**
+   * The cache is split into 2^num_shard_bits shards. A negative value lets
+   * RocksDB pick.
+   *
+   * @since 0
+   */
+  int num_shard_bits;
+
+  /** @since 0 */
+  bool strict_capacity_limit;
+};
+
+struct rocksdb_cache_s {
+  rocksdb_cache_type_t type;
+
+  union {
+    rocksdb_lru_cache_options_t lru;
+    rocksdb_hyper_clock_cache_options_t hyper_clock;
+  };
+};
+
+/** @version 9 */
 struct rocksdb_options_s {
   int version;
 
@@ -141,6 +211,15 @@ struct rocksdb_options_s {
 
   /** @since 8 */
   size_t wal_filter_prefixes_len;
+
+  /**
+   * The block cache shared by every column family that does not disable it.
+   * With `rocksdb_default_cache`, each column family instead gets its own
+   * cache of RocksDB's default type and size.
+   *
+   * @since 9
+   */
+  rocksdb_cache_t block_cache;
 };
 
 typedef enum {
@@ -699,6 +778,18 @@ rocksdb_compact_range_options_init(rocksdb_compact_range_options_t *options, int
 
 void
 rocksdb_approximate_size_options_init(rocksdb_approximate_size_options_t *options, int version);
+
+void
+rocksdb_bloom_filter_options_init(rocksdb_bloom_filter_options_t *options, int version);
+
+void
+rocksdb_ribbon_filter_options_init(rocksdb_ribbon_filter_options_t *options, int version);
+
+void
+rocksdb_lru_cache_options_init(rocksdb_lru_cache_options_t *options, int version);
+
+void
+rocksdb_hyper_clock_cache_options_init(rocksdb_hyper_clock_cache_options_t *options, int version);
 
 int
 rocksdb_open(uv_loop_t *loop, rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_idle_cb idle, rocksdb_open_cb cb);
