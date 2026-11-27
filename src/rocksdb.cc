@@ -247,6 +247,34 @@ static const rocksdb_approximate_size_options_t rocksdb__default_approximate_siz
   .files_size_error_margin = -1.0,
 };
 
+static const rocksdb_bloom_filter_options_t rocksdb__default_bloom_filter_options = {
+  .version = 0,
+  .bits_per_key = 10.0,
+};
+
+static const rocksdb_ribbon_filter_options_t rocksdb__default_ribbon_filter_options = {
+  .version = 0,
+  .bloom_equivalent_bits_per_key = 10.0,
+  .bloom_before_level = 0,
+};
+
+static const rocksdb_lru_cache_options_t rocksdb__default_lru_cache_options = {
+  .version = 0,
+  .capacity = 32 * 1024 * 1024,
+  .num_shard_bits = -1,
+  .strict_capacity_limit = false,
+  .high_pri_pool_ratio = 0.5,
+  .low_pri_pool_ratio = 0.0,
+};
+
+static const rocksdb_hyper_clock_cache_options_t rocksdb__default_hyper_clock_cache_options = {
+  .version = 0,
+  .capacity = 32 * 1024 * 1024,
+  .estimated_entry_charge = 0,
+  .num_shard_bits = -1,
+  .strict_capacity_limit = false,
+};
+
 } // namespace
 
 namespace {
@@ -312,6 +340,30 @@ template <>
 inline const rocksdb_approximate_size_options_t &
 rocksdb__options_default() {
   return rocksdb__default_approximate_size_options;
+}
+
+template <>
+inline const rocksdb_bloom_filter_options_t &
+rocksdb__options_default() {
+  return rocksdb__default_bloom_filter_options;
+}
+
+template <>
+inline const rocksdb_ribbon_filter_options_t &
+rocksdb__options_default() {
+  return rocksdb__default_ribbon_filter_options;
+}
+
+template <>
+inline const rocksdb_lru_cache_options_t &
+rocksdb__options_default() {
+  return rocksdb__default_lru_cache_options;
+}
+
+template <>
+inline const rocksdb_hyper_clock_cache_options_t &
+rocksdb__options_default() {
+  return rocksdb__default_hyper_clock_cache_options;
 }
 
 template <auto P, typename T>
@@ -427,6 +479,42 @@ rocksdb__options_size<rocksdb_approximate_size_options_t>(int version) {
   switch (version) {
   default:
     return sizeof(rocksdb_approximate_size_options_t);
+  }
+}
+
+template <>
+inline size_t
+rocksdb__options_size<rocksdb_bloom_filter_options_t>(int version) {
+  switch (version) {
+  default:
+    return sizeof(rocksdb_bloom_filter_options_t);
+  }
+}
+
+template <>
+inline size_t
+rocksdb__options_size<rocksdb_ribbon_filter_options_t>(int version) {
+  switch (version) {
+  default:
+    return sizeof(rocksdb_ribbon_filter_options_t);
+  }
+}
+
+template <>
+inline size_t
+rocksdb__options_size<rocksdb_lru_cache_options_t>(int version) {
+  switch (version) {
+  default:
+    return sizeof(rocksdb_lru_cache_options_t);
+  }
+}
+
+template <>
+inline size_t
+rocksdb__options_size<rocksdb_hyper_clock_cache_options_t>(int version) {
+  switch (version) {
+  default:
+    return sizeof(rocksdb_hyper_clock_cache_options_t);
   }
 }
 
@@ -807,6 +895,26 @@ rocksdb_compact_range_options_init(rocksdb_compact_range_options_t *options, int
 
 extern "C" void
 rocksdb_approximate_size_options_init(rocksdb_approximate_size_options_t *options, int version) {
+  rocksdb__options_init(options, version);
+}
+
+extern "C" void
+rocksdb_bloom_filter_options_init(rocksdb_bloom_filter_options_t *options, int version) {
+  rocksdb__options_init(options, version);
+}
+
+extern "C" void
+rocksdb_ribbon_filter_options_init(rocksdb_ribbon_filter_options_t *options, int version) {
+  rocksdb__options_init(options, version);
+}
+
+extern "C" void
+rocksdb_lru_cache_options_init(rocksdb_lru_cache_options_t *options, int version) {
+  rocksdb__options_init(options, version);
+}
+
+extern "C" void
+rocksdb_hyper_clock_cache_options_init(rocksdb_hyper_clock_cache_options_t *options, int version) {
   rocksdb__options_init(options, version);
 }
 

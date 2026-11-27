@@ -71,34 +71,15 @@ test_shared_cache(const char *path, rocksdb_cache_t block_cache, uint64_t capaci
 
 int
 main() {
-  test_shared_cache(
-    "test/fixtures/block-cache-lru.db",
-    (rocksdb_cache_t) {
-      .type = rocksdb_lru_cache,
-      .lru = {
-        .version = 0,
-        .capacity = 4 * 1024 * 1024,
-        .num_shard_bits = -1,
-        .strict_capacity_limit = false,
-        .high_pri_pool_ratio = 0.5,
-        .low_pri_pool_ratio = 0.0,
-      },
-    },
-    4 * 1024 * 1024
-  );
+  rocksdb_cache_t lru = {.type = rocksdb_lru_cache};
+  rocksdb_lru_cache_options_init(&lru.lru, 0);
+  lru.lru.capacity = 4 * 1024 * 1024;
 
-  test_shared_cache(
-    "test/fixtures/block-cache-hyper-clock.db",
-    (rocksdb_cache_t) {
-      .type = rocksdb_hyper_clock_cache,
-      .hyper_clock = {
-        .version = 0,
-        .capacity = 8 * 1024 * 1024,
-        .estimated_entry_charge = 0,
-        .num_shard_bits = -1,
-        .strict_capacity_limit = false,
-      },
-    },
-    8 * 1024 * 1024
-  );
+  test_shared_cache("test/fixtures/block-cache-lru.db", lru, 4 * 1024 * 1024);
+
+  rocksdb_cache_t hyper_clock = {.type = rocksdb_hyper_clock_cache};
+  rocksdb_hyper_clock_cache_options_init(&hyper_clock.hyper_clock, 0);
+  hyper_clock.hyper_clock.capacity = 8 * 1024 * 1024;
+
+  test_shared_cache("test/fixtures/block-cache-hyper-clock.db", hyper_clock, 8 * 1024 * 1024);
 }

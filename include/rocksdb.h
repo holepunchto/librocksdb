@@ -779,6 +779,18 @@ rocksdb_compact_range_options_init(rocksdb_compact_range_options_t *options, int
 void
 rocksdb_approximate_size_options_init(rocksdb_approximate_size_options_t *options, int version);
 
+void
+rocksdb_bloom_filter_options_init(rocksdb_bloom_filter_options_t *options, int version);
+
+void
+rocksdb_ribbon_filter_options_init(rocksdb_ribbon_filter_options_t *options, int version);
+
+void
+rocksdb_lru_cache_options_init(rocksdb_lru_cache_options_t *options, int version);
+
+void
+rocksdb_hyper_clock_cache_options_init(rocksdb_hyper_clock_cache_options_t *options, int version);
+
 int
 rocksdb_open(uv_loop_t *loop, rocksdb_t *db, rocksdb_open_t *req, const char *path, const rocksdb_options_t *options, const rocksdb_column_family_descriptor_t column_families[], rocksdb_column_family_t *handles[], size_t len, rocksdb_idle_cb idle, rocksdb_open_cb cb);
 
