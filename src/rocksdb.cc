@@ -157,7 +157,7 @@ rocksdb__from(WalFileType type) {
 namespace {
 
 static const rocksdb_options_t rocksdb__default_options = {
-  .version = 8,
+  .version = 9,
   .read_only = false,
   .create_if_missing = false,
   .create_missing_column_families = false,
@@ -179,7 +179,9 @@ static const rocksdb_options_t rocksdb__default_options = {
   .avoid_flush_during_shutdown = false,
   .wal_filter_prefixes = nullptr,
   .wal_filter_prefixes_len = 0,
-  .block_cache_size = 0
+  .block_cache = (rocksdb_cache_t) {
+    .type = rocksdb_default_cache,
+  },
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
@@ -343,7 +345,7 @@ rocksdb__options_size<rocksdb_options_t>(int version) {
   case 7:
     return offsetof(rocksdb_options_t, avoid_flush_during_shutdown);
   case 8:
-    return offsetof(rocksdb_options_t, block_cache_size);
+    return offsetof(rocksdb_options_t, block_cache);
   default:
     return sizeof(rocksdb_options_t);
   }
@@ -975,11 +977,40 @@ rocksdb__on_open(uv_work_t *handle) {
   // separate cache per column family with no way to bound the total.
   std::shared_ptr<Cache> block_cache;
 
-  auto block_cache_size = rocksdb__option<&rocksdb_options_t::block_cache_size, uint64_t>(
+  auto block_cache_options = rocksdb__option<&rocksdb_options_t::block_cache, rocksdb_cache_t>(
     &req->options, 9
   );
 
-  if (block_cache_size > 0) block_cache = NewLRUCache(block_cache_size);
+  switch (block_cache_options.type) {
+  case rocksdb_lru_cache: {
+    auto &lru = block_cache_options.lru;
+
+    LRUCacheOptions options;
+    options.capacity = lru.capacity;
+    options.num_shard_bits = lru.num_shard_bits;
+    options.strict_capacity_limit = lru.strict_capacity_limit;
+    options.high_pri_pool_ratio = lru.high_pri_pool_ratio;
+    options.low_pri_pool_ratio = lru.low_pri_pool_ratio;
+
+    block_cache = options.MakeSharedCache();
+    break;
+  }
+
+  case rocksdb_hyper_clock_cache: {
+    auto &hyper_clock = block_cache_options.hyper_clock;
+
+    HyperClockCacheOptions options(hyper_clock.capacity, hyper_clock.estimated_entry_charge);
+    options.num_shard_bits = hyper_clock.num_shard_bits;
+    options.strict_capacity_limit = hyper_clock.strict_capacity_limit;
+
+    block_cache = options.MakeSharedCache();
+    break;
+  }
+
+  case rocksdb_default_cache:
+  default:
+    break;
+  }
 
   for (size_t i = 0, n = req->len; i < n; i++) {
     auto &column_family = req->column_families[i];
