@@ -2,6 +2,7 @@
 #include <vector>
 
 #include <rocksdb/advanced_options.h>
+#include <rocksdb/cache.h>
 #include <rocksdb/convenience.h>
 #include <rocksdb/db.h>
 #include <rocksdb/filter_policy.h>
@@ -177,7 +178,8 @@ static const rocksdb_options_t rocksdb__default_options = {
   .wal_size_limit_mb = 0,
   .avoid_flush_during_shutdown = false,
   .wal_filter_prefixes = nullptr,
-  .wal_filter_prefixes_len = 0
+  .wal_filter_prefixes_len = 0,
+  .block_cache_size = 0
 };
 
 static const rocksdb_column_family_options_t rocksdb__default_column_family_options = {
@@ -340,6 +342,8 @@ rocksdb__options_size<rocksdb_options_t>(int version) {
     return offsetof(rocksdb_options_t, wal_ttl_seconds);
   case 7:
     return offsetof(rocksdb_options_t, avoid_flush_during_shutdown);
+  case 8:
+    return offsetof(rocksdb_options_t, block_cache_size);
   default:
     return sizeof(rocksdb_options_t);
   }
@@ -967,6 +971,16 @@ rocksdb__on_open(uv_work_t *handle) {
 
   auto column_families = std::vector<ColumnFamilyDescriptor>(req->len);
 
+  // Created once and shared by every column family, as the default is a
+  // separate cache per column family with no way to bound the total.
+  std::shared_ptr<Cache> block_cache;
+
+  auto block_cache_size = rocksdb__option<&rocksdb_options_t::block_cache_size, uint64_t>(
+    &req->options, 9
+  );
+
+  if (block_cache_size > 0) block_cache = NewLRUCache(block_cache_size);
+
   for (size_t i = 0, n = req->len; i < n; i++) {
     auto &column_family = req->column_families[i];
 
@@ -1015,6 +1029,10 @@ rocksdb__on_open(uv_work_t *handle) {
     table_options.no_block_cache = rocksdb__option<&rocksdb_column_family_options_t::no_block_cache, bool>(
       &column_family.options, 1
     );
+
+    if (block_cache && !table_options.no_block_cache) {
+      table_options.block_cache = block_cache;
+    }
 
     auto filter_policy = rocksdb__option<&rocksdb_column_family_options_t::filter_policy, rocksdb_filter_policy_t>(
       &column_family.options, 2

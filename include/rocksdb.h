@@ -75,7 +75,7 @@ typedef enum {
   rocksdb_stats_level_all = 5,
 } rocksdb_stats_level_t;
 
-/** @version 8 */
+/** @version 9 */
 struct rocksdb_options_s {
   int version;
 
@@ -141,6 +141,15 @@ struct rocksdb_options_s {
 
   /** @since 8 */
   size_t wal_filter_prefixes_len;
+
+  /**
+   * The size in bytes of the block cache shared by every column family that
+   * does not disable it. Zero leaves each column family with its own cache of
+   * RocksDB's default size.
+   *
+   * @since 9
+   */
+  uint64_t block_cache_size;
 };
 
 typedef enum {
